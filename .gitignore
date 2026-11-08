@@ -1,0 +1,11 @@
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+*.xcodeproj/xcuserdata/
+.logs/
+eval/
+mneme-eval/
+build/
+.idea/
+*.xcuserstate
