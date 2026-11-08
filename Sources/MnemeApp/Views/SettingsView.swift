@@ -37,6 +37,20 @@ struct LanguagesSettings: View {
                     }
                 }
             }
+            Section {
+                Toggle("I switch languages within a recording", isOn: mixedBinding)
+                Text(model.mixedLanguages
+                    ? "Each sentence gets its own language, so a recording that moves from French to English is transcribed in both."
+                    : "One language for the whole recording: a little faster, but a sentence in another language may come out translated or be left out.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } footer: {
+                if model.languageProfile.count < 2 {
+                    Text("Applies when two or more languages are selected.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Section("Other languages") {
                 HStack {
                     TextField("Codes or names", text: $other, prompt: Text("sw, tl, Swahili"))
@@ -65,6 +79,14 @@ struct LanguagesSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var mixedBinding: Binding<Bool> {
+        Binding(get: { model.mixedLanguages }, set: { enabled in
+            Task {
+                await model.setMixedLanguages(enabled)
+            }
+        })
     }
 
     private func binding(for code: String) -> Binding<Bool> {

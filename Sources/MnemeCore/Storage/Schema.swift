@@ -6,7 +6,7 @@ enum Schema {
         migrations.count
     }
 
-    static let migrations: [String] = [v1, v2]
+    static let migrations: [String] = [v1, v2, v3]
 
     static func migrate(_ database: Database) throws {
         let current = try database.userVersion()
@@ -147,5 +147,10 @@ enum Schema {
             entry_id UNINDEXED,
             tokenize = 'unicode61 remove_diacritics 2'
         );
+        """
+
+    // The language each segment was decoded in, for speakers who switch languages within a recording.
+    private static let v3 = """
+        ALTER TABLE segment ADD COLUMN language TEXT CHECK (language IS NULL OR length(language) BETWEEN 2 AND 3);
         """
 }

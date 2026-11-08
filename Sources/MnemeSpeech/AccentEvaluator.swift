@@ -15,6 +15,8 @@ public struct AccentEvaluator {
     public var languageMode: LanguageMode
     public var languageProfile: [String]
     public var glossary: [String]
+    /// How recordings are divided for language identification in detect mode.
+    public var languageStrategy: LanguageStrategy
     public var sanitizer: TranscriptSanitizer
 
     public init(
@@ -22,12 +24,14 @@ public struct AccentEvaluator {
         languageMode: LanguageMode = .reference,
         languageProfile: [String] = [],
         glossary: [String] = [],
+        languageStrategy: LanguageStrategy = .window,
         sanitizer: TranscriptSanitizer = TranscriptSanitizer()
     ) {
         self.engine = engine
         self.languageMode = languageMode
         self.languageProfile = languageProfile
         self.glossary = glossary
+        self.languageStrategy = languageStrategy
         self.sanitizer = sanitizer
     }
 
@@ -58,11 +62,19 @@ public struct AccentEvaluator {
                 audioURL: audioURL,
                 forcedLanguage: languageMode == .reference ? item.language : nil,
                 languageProfile: languageMode == .detect ? languageProfile : [],
-                glossary: glossary
+                glossary: glossary,
+                languageStrategy: languageStrategy
             )
             let transcript = try await engine.transcribe(request)
             let clean = try sanitizer.sanitize(transcript, duration: duration).transcript
             let hypothesis = clean.text
+            var languages: [String] = []
+            for segment in clean.segments {
+                let code = segment.language ?? clean.language.code
+                if languages.last != code {
+                    languages.append(code)
+                }
+            }
             return EvalResult(
                 item: item,
                 hypothesis: hypothesis,
@@ -72,7 +84,8 @@ public struct AccentEvaluator {
                 characters: ErrorRate.characterErrors(reference: item.text, hypothesis: hypothesis),
                 flaggedSegments: clean.flaggedSegmentCount,
                 audioSeconds: duration,
-                processingSeconds: clean.processingSeconds
+                processingSeconds: clean.processingSeconds,
+                segmentLanguages: languages
             )
         } catch {
             return EvalResult(item: item, error: error.localizedDescription)

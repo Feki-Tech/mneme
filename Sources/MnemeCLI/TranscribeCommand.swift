@@ -22,6 +22,12 @@ struct TranscribeCommand: AsyncParsableCommand {
     @Option(name: .customLong("term"), help: "Glossary term for the decoder prompt (repeatable).")
     var terms: [String] = []
 
+    @Option(
+        name: .customLong("language-strategy"),
+        help: "With two or more --profile languages: recording, window or sentence (default: sentence)."
+    )
+    var languageStrategy: LanguageStrategyOption = .sentence
+
     @Flag(help: "Also print the raw segments, before validation.")
     var raw = false
 
@@ -53,7 +59,8 @@ struct TranscribeCommand: AsyncParsableCommand {
             forcedLanguage: language.flatMap { LanguagePolicy.resolve($0) },
             languageProfile: profile,
             glossary: terms,
-            wordTimestamps: !noWords
+            wordTimestamps: !noWords,
+            languageStrategy: languageStrategy.strategy
         ))
         let sanitized = try TranscriptSanitizer().sanitize(rawTranscript, duration: audio.durationSeconds)
 

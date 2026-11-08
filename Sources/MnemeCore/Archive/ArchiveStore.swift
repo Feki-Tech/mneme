@@ -32,6 +32,7 @@ public final class ArchiveStore {
     public static let databaseFilename = "archive.sqlite"
     public static let correctionEngine = "user-correction"
     public static let languageProfileKey = "language_profile"
+    public static let mixedLanguagesKey = "mixed_languages"
 
     public static var defaultRoot: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -474,7 +475,7 @@ public final class ArchiveStore {
     /// Segments the user verified or corrected, as evaluation items: a personal accent dataset.
     public func verifiedSegments() throws -> [EvalItem] {
         try database.query("""
-            SELECT e.id, a.blob_path, s.idx, s.start_s, s.end_s, s.text, t.language
+            SELECT e.id, a.blob_path, s.idx, s.start_s, s.end_s, s.text, COALESCE(s.language, t.language)
             FROM segment s
             JOIN transcript t ON t.id = s.transcript_id AND t.is_current = 1
             JOIN asset a ON a.id = t.asset_id
@@ -566,6 +567,23 @@ public final class ArchiveStore {
         let codes = try LanguagePolicy.validatedList(languages)
         try setSetting(ArchiveStore.languageProfileKey, codes.isEmpty ? nil : codes.joined(separator: ","))
         return codes
+    }
+
+    /// Whether the speaker switches languages within a recording (on unless turned off). With two or more
+    /// languages in the profile, recordings are then identified sentence by sentence.
+    public func mixedLanguages() throws -> Bool {
+        try setting(ArchiveStore.mixedLanguagesKey) != "0"
+    }
+
+    public func setMixedLanguages(_ enabled: Bool) throws {
+        try setSetting(ArchiveStore.mixedLanguagesKey, enabled ? nil : "0")
+    }
+
+    /// How recordings are divided for language identification. Only used when the profile lists two or
+    /// more languages and no language was chosen for the recording. Without switching, one identification
+    /// for the whole recording is the most robust choice (measured on the code-switching and accent sets).
+    public func languageStrategy() throws -> LanguageStrategy {
+        try mixedLanguages() ? .sentence : .recording
     }
 
     // MARK: - Integrity
@@ -667,8 +685,8 @@ public final class ArchiveStore {
         for segment in transcript.segments {
             try database.run("""
                 INSERT INTO segment (transcript_id, idx, start_s, end_s, text, avg_logprob, compression_ratio,
-                                     no_speech_prob, temperature, flags)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     no_speech_prob, temperature, flags, language)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, [
                 .text(id),
                 .int(segment.index),
@@ -680,6 +698,7 @@ public final class ArchiveStore {
                 .optional(segment.noSpeechProb),
                 .optional(segment.temperature),
                 .text(QualityFlag.encode(segment.flags)),
+                .optional(segment.language),
             ])
             for (wordIndex, word) in segment.words.enumerated() {
                 try database.run("""
@@ -777,7 +796,7 @@ public final class ArchiveStore {
 
     private func loadSegments(transcriptID: String) throws -> [TranscribedSegment] {
         var segments = try database.query("""
-            SELECT idx, start_s, end_s, text, avg_logprob, compression_ratio, no_speech_prob, temperature, flags
+            SELECT idx, start_s, end_s, text, avg_logprob, compression_ratio, no_speech_prob, temperature, flags, language
             FROM segment
             WHERE transcript_id = ?
             ORDER BY idx
@@ -792,7 +811,8 @@ public final class ArchiveStore {
                 noSpeechProb: row.optionalDouble(6),
                 temperature: row.optionalDouble(7),
                 words: [],
-                flags: QualityFlag.decode(row.string(8))
+                flags: QualityFlag.decode(row.string(8)),
+                language: row.optionalString(9)
             )
         }
         let words = try database.query("""

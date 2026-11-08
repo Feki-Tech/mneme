@@ -52,7 +52,7 @@ struct ArchiveOptions: ParsableArguments {
 struct ModelOptions: ParsableArguments {
     @Option(
         name: .customLong("model"),
-        help: "accurate (Whisper large-v3, about 3 GB, default), fast (large-v3 turbo, 626 MB) or a WhisperKit variant."
+        help: "fast (large-v3 turbo, 626 MB, default), accurate (Whisper large-v3, about 3 GB) or a WhisperKit variant."
     )
     var model: String = ModelProfile.defaultProfile.name
 

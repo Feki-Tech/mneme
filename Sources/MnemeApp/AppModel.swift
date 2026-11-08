@@ -49,6 +49,13 @@ final class AppModel: ObservableObject {
     @Published private(set) var modelReady = false
     /// The model is loaded in this session; until then the first transcription also loads it.
     @Published private(set) var modelLoaded = false
+    /// The model is being loaded ahead of time (at launch or when a recording starts).
+    @Published private(set) var isPreparingModel = false
+    /// Share of the current transcription done, and its text so far.
+    @Published private(set) var transcriptionProgress: Double?
+    @Published private(set) var partialTranscript = ""
+    /// Each sentence gets its own language (for speakers who switch languages within a recording).
+    @Published private(set) var mixedLanguages = true
     @Published private(set) var modelProfile: ModelProfile
     @Published private(set) var isDownloading = false
     @Published private(set) var downloadProgress: Double?
@@ -110,6 +117,24 @@ final class AppModel: ObservableObject {
         await recoverRecordings()
         await refreshModelStatus()
         await queueUntranscribed()
+        prepareModel()
+    }
+
+    /// Loads the model in the background so the next transcription starts at once. Loading the large model
+    /// takes several seconds, and minutes the first time after an installation while Core ML prepares it.
+    func prepareModel() {
+        guard modelReady, !modelLoaded, !isPreparingModel else { return }
+        isPreparingModel = true
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await self.worker.ensureModelLoaded()
+                self.modelLoaded = true
+            } catch {
+                // Reported when a transcription needs the model.
+            }
+            self.isPreparingModel = false
+        }
     }
 
     func reload() async {
@@ -148,6 +173,7 @@ final class AppModel: ObservableObject {
         }
         do {
             try recorder.start(in: recordingsFolder)
+            prepareModel()
         } catch {
             show(error)
         }
@@ -243,9 +269,18 @@ final class AppModel: ObservableObject {
         while !queuedEntryIDs.isEmpty {
             let entryID = queuedEntryIDs.removeFirst()
             transcribingEntryID = entryID
+            transcriptionProgress = 0
+            partialTranscript = ""
             modelLoaded = await worker.isModelLoaded()
             do {
-                try await worker.transcribe(entryID: entryID, language: languageOverrides[entryID])
+                try await worker.transcribe(entryID: entryID, language: languageOverrides[entryID]) { update in
+                    Task { @MainActor [weak self] in
+                        guard let self, self.transcribingEntryID == entryID else { return }
+                        self.modelLoaded = true
+                        self.transcriptionProgress = update.fractionCompleted
+                        self.partialTranscript = update.text
+                    }
+                }
                 languageOverrides[entryID] = nil
                 modelLoaded = true
             } catch {
@@ -261,6 +296,8 @@ final class AppModel: ObservableObject {
                 }
             }
             transcribingEntryID = nil
+            transcriptionProgress = nil
+            partialTranscript = ""
             await reload()
         }
         queueTask = nil
@@ -392,6 +429,7 @@ final class AppModel: ObservableObject {
         do {
             languageProfile = try await worker.languageProfile()
             glossary = try await worker.glossary()
+            mixedLanguages = try await worker.mixedLanguages()
         } catch {
             show(error)
         }
@@ -408,6 +446,15 @@ final class AppModel: ObservableObject {
     func setLanguages(_ codes: [String]) async {
         do {
             languageProfile = try await worker.setLanguageProfile(codes)
+        } catch {
+            show(error)
+        }
+    }
+
+    func setMixedLanguages(_ enabled: Bool) async {
+        do {
+            try await worker.setMixedLanguages(enabled)
+            mixedLanguages = try await worker.mixedLanguages()
         } catch {
             show(error)
         }
@@ -441,8 +488,10 @@ final class AppModel: ObservableObject {
         UserDefaults.standard.set(profile.name, forKey: AppModel.profileKey)
         modelProfile = profile
         await worker.setProfile(profile)
+        modelLoaded = false
         await refreshModelStatus()
         await queueUntranscribed()
+        prepareModel()
     }
 
     /// Started only by the user's click in Settings: the one place where Mneme uses the network.
@@ -457,6 +506,7 @@ final class AppModel: ObservableObject {
                 }
             }
             await refreshModelStatus()
+            modelLoaded = await worker.isModelLoaded()
             await queueUntranscribed()
         } catch {
             notice = Notice(title: "The model could not be downloaded", message: error.localizedDescription)

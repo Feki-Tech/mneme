@@ -16,6 +16,8 @@ struct ContentView: View {
                 }
                 if !model.modelReady {
                     ModelBanner()
+                } else if model.isPreparingModel && model.transcribingEntryID == nil {
+                    PreparingBanner()
                 }
                 if !model.suggestions.isEmpty {
                     SuggestionBanner()
@@ -131,6 +133,23 @@ struct RecordingBanner: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .background(Color.red.opacity(0.10))
+    }
+}
+
+/// The model is loading ahead of the next transcription.
+struct PreparingBanner: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Preparing the speech model so recordings are transcribed right away. The first time after an installation this takes a few minutes.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Color.secondary.opacity(0.08))
     }
 }
 

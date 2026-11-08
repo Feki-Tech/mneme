@@ -86,6 +86,7 @@ public struct TranscriptSanitizer: Sendable {
             segment.compressionRatio = Self.finite(segment.compressionRatio).map { max(0, $0) }
             segment.noSpeechProb = Self.unitInterval(segment.noSpeechProb)
             segment.temperature = Self.finite(segment.temperature).map { max(0, $0) }
+            segment.language = original.language.flatMap { LanguagePolicy.validatedCode($0) }
             if segment.start < 0 {
                 guard segment.start >= -tolerance else {
                     throw ArchiveError.invalidTranscript("segment \(original.index) starts before the recording")
@@ -159,6 +160,25 @@ public struct TranscriptSanitizer: Sendable {
                 flags.insert(.unreliableTiming)
             }
             segments[index].flags = flags
+        }
+
+        // A mixed-language transcript is labelled with the language spoken longest among the kept segments that
+        // carry a language (segments without one would follow the label and make relabelling unstable).
+        if language.source == .mixed {
+            var seconds: [String: Double] = [:]
+            for segment in segments {
+                if let code = segment.language {
+                    seconds[code, default: 0] += max(0, segment.end - segment.start)
+                }
+            }
+            let ranked = seconds.sorted { lhs, rhs in
+                lhs.value != rhs.value ? lhs.value > rhs.value : lhs.key < rhs.key
+            }
+            let total = ranked.reduce(0) { $0 + $1.value }
+            if let top = ranked.first {
+                language.code = top.key
+                language.probability = total > 0 ? Self.unitInterval(top.value / total) : nil
+            }
         }
 
         let clean = Transcript(

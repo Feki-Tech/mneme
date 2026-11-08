@@ -111,7 +111,12 @@ struct VoiceEntryView: View {
         }
         if let transcript = details.transcript {
             let decision = transcript.transcript.language
-            parts.append("\(Formatters.languageName(decision.code)) (\(languageSource(decision.source)))")
+            if decision.source == .mixed {
+                let names = transcript.transcript.speechByLanguage.map { Formatters.languageName($0.code) }
+                parts.append(ListFormatter.localizedString(byJoining: names) + " (switches detected per sentence)")
+            } else {
+                parts.append("\(Formatters.languageName(decision.code)) (\(languageSource(decision.source)))")
+            }
             if details.versions.count > 1 {
                 parts.append("version \(transcript.version) of \(details.versions.count)")
             }
@@ -127,6 +132,7 @@ struct VoiceEntryView: View {
         case .constrained: return "detected among your languages"
         case .model: return "detected by the model"
         case .fallback: return "default"
+        case .mixed: return "several languages"
         }
     }
 
@@ -139,16 +145,7 @@ struct VoiceEntryView: View {
                 transcriptList(record.transcript)
             }
         } else if model.transcribingEntryID == details.entry.id {
-            VStack(spacing: 10) {
-                ProgressView()
-                Text(model.modelLoaded ? "Transcribing on this Mac…" : "Loading the speech model, then transcribing…")
-                if !model.modelLoaded {
-                    Text("The first load after installing a model can take a few minutes.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            TranscribingView()
         } else if model.queuedEntryIDs.contains(details.entry.id) {
             ProgressView("Waiting to be transcribed…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -179,6 +176,7 @@ struct VoiceEntryView: View {
                 ForEach(transcript.segments, id: \.index) { segment in
                     SegmentRow(
                         segment: segment,
+                        languageTag: transcript.language.source == .mixed ? (segment.language ?? transcript.language.code) : nil,
                         isActive: player.isWithin(details.audioURL, start: segment.start, end: segment.end),
                         isEditing: editingSegment == segment.index,
                         draft: $draft,
@@ -261,8 +259,50 @@ struct PlayerBar: View {
     }
 }
 
+/// Progress of the transcription, with the text decoded so far.
+struct TranscribingView: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                if let fraction = model.transcriptionProgress, model.modelLoaded {
+                    ProgressView(value: fraction)
+                        .frame(maxWidth: 260)
+                    Text("Transcribing on this Mac… \(Int((fraction * 100).rounded())) %")
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading the speech model, then transcribing…")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if !model.modelLoaded {
+                Text("The first load after installing a model can take a few minutes.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            if !model.partialTranscript.isEmpty {
+                ScrollView {
+                    Text(model.partialTranscript)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(20)
+    }
+}
+
 struct SegmentRow: View {
     let segment: TranscribedSegment
+    /// The segment's language, shown when the recording mixes languages.
+    var languageTag: String? = nil
     let isActive: Bool
     let isEditing: Bool
     @Binding var draft: String
@@ -291,9 +331,20 @@ struct SegmentRow: View {
                             .keyboardShortcut(.cancelAction)
                     }
                 } else {
-                    Text(segment.text)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        if let languageTag {
+                            Text(languageTag.uppercased())
+                                .font(.caption2.weight(.semibold).monospaced())
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.15)))
+                                .foregroundStyle(.secondary)
+                                .help(Formatters.languageName(languageTag))
+                        }
+                        Text(segment.text)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     if !segment.flags.isEmpty {
                         FlagBadges(flags: segment.flags)
                     }

@@ -15,24 +15,25 @@ public struct ModelProfile: Equatable, Sendable {
         self.summary = summary
     }
 
-    /// Whisper large-v3 with its full 32-layer decoder: the most robust choice for accented and noisy speech.
+    /// Whisper large-v3 with its full 32-layer decoder: kept for difficult recordings.
     public static let accurate = ModelProfile(
         name: "accurate",
         variant: "large-v3",
         approximateDownloadSize: "about 3 GB",
-        summary: "Whisper large-v3, full decoder. Most robust to accents; slowest."
+        summary: "Whisper large-v3, full 32-layer decoder. 3–5× slower than turbo; try it on recordings turbo finds hard."
     )
 
-    /// Compressed large-v3 turbo: Argmax's recommended multilingual model, several times faster.
+    /// Compressed large-v3 turbo: the same encoder with a 4-layer decoder. Measured on this project's accent set,
+    /// it matched large-v3 (1.1 % WER) at 3.6× (English) to 5.1× (French) the speed on long recordings.
     public static let fast = ModelProfile(
         name: "fast",
         variant: "large-v3-v20240930_626MB",
         approximateDownloadSize: "about 626 MB",
-        summary: "Whisper large-v3 turbo, compressed. Much faster; slightly less robust on rare accents."
+        summary: "Whisper large-v3 turbo (4-layer decoder), compressed. Same accuracy as large-v3 on the accent test, 3–5× faster."
     )
 
-    public static let builtIn: [ModelProfile] = [accurate, fast]
-    public static let defaultProfile = accurate
+    public static let builtIn: [ModelProfile] = [fast, accurate]
+    public static let defaultProfile = fast
 
     /// A built-in profile by name ("accurate", "fast"), or any WhisperKit variant name ("small", "large-v3_turbo").
     public static func resolve(_ name: String) -> ModelProfile {

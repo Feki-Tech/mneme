@@ -45,28 +45,35 @@ public final class IngestPipeline {
 
     /// Transcribes an archived recording, for example one saved before the model was ready, as a new version.
     @discardableResult
-    public func transcribeEntry(_ entryID: String, language: String? = nil) async throws -> (record: TranscriptRecord, report: SanitizationReport) {
+    public func transcribeEntry(
+        _ entryID: String,
+        language: String? = nil,
+        progress: TranscriptionProgressHandler? = nil
+    ) async throws -> (record: TranscriptRecord, report: SanitizationReport) {
         guard let recording = try archive.assets(entryID: entryID).first else {
             throw ArchiveError.notFound("a recording for entry \(entryID)")
         }
-        let transcript = try await transcribe(archive.audioURL(for: recording), language: language)
+        let transcript = try await transcribe(archive.audioURL(for: recording), language: language, progress: progress)
         return try archive.addTranscriptVersion(assetID: recording.id, transcript: transcript)
     }
 
-    /// Transcribes with the archive's language profile and glossary.
-    public func transcribe(_ url: URL, language: String?) async throws -> Transcript {
+    /// Transcribes with the archive's language profile, glossary and mixed-languages setting.
+    public func transcribe(
+        _ url: URL,
+        language: String?,
+        progress: TranscriptionProgressHandler? = nil
+    ) async throws -> Transcript {
         if !engine.isLoaded {
             willLoadModel?(engine.profile)
             try await engine.load(allowDownload: allowDownload)
         }
-        let profile = try archive.languageProfile()
-        let glossary = try archive.glossary()
         let request = TranscriptionRequest(
             audioURL: url,
             forcedLanguage: language,
-            languageProfile: profile,
-            glossary: glossary
+            languageProfile: try archive.languageProfile(),
+            glossary: try archive.glossary(),
+            languageStrategy: try archive.languageStrategy()
         )
-        return try await engine.transcribe(request)
+        return try await engine.transcribe(request, progress: progress)
     }
 }

@@ -3,7 +3,7 @@
 Mneme is a Mac app for recording thoughts and writing notes, with the engine behind it also available as a command-line tool:
 
 - **The app.** Record, play back, review the passages the recogniser was unsure about, write and edit notes, search everything.
-- **Speech recognition on your Mac.** Whisper large-v3 runs through WhisperKit (Core ML on the Apple Neural Engine). It handles many accents and 100 languages.
+- **Speech recognition on your Mac.** Whisper large-v3 turbo (or the full large-v3) runs through WhisperKit (Core ML on the Apple Neural Engine). It handles many accents, 100 languages, and speakers who switch languages from one sentence to the next.
 - **A structured archive.** SQLite stores entries, recordings, versioned transcripts, segments and word timings, with full-text search. The original recordings are kept, verified by checksum.
 - **Accent tests.** A harness reports word and character error rates per accent, region and language.
 
@@ -46,7 +46,8 @@ The first recording asks for microphone access. The app uses the same archive an
 - **Review (⇧⌘R).** Every passage flagged as uncertain, across the archive. Listen, then correct it or confirm it as right. Corrections become new transcript versions, feed your accent data set, and suggest glossary terms.
 - **Notes (⌘N).** Typed notes are versioned like transcripts: saving changed text adds a version and keeps the earlier ones. Leaving the editor saves too. The language of each note is detected and stored.
 - **Search.** Transcripts, notes and titles, ignoring case and accents.
-- **Settings.** Your languages, the glossary, the speech model (a download starts only when you click it, with its size shown), and the archive check.
+- **Settings.** Your languages (and whether you switch between them within a recording), the glossary, the speech model (a download starts only when you click it, with its size shown), and the archive check.
+- **Speed.** The model is loaded in the background at launch and when a recording starts, so transcription begins as soon as you stop. Progress and the text decoded so far are shown while it runs.
 - **Deletion.** Removes the recording, all transcript and note versions and the search entries. Deleted database content is overwritten, not left in free pages.
 
 Without a model, recordings are still archived and wait for transcription.
@@ -56,8 +57,8 @@ Without a model, recordings are still archived and wait for transcription.
 Each download is something you choose, and you see its size before it starts:
 
 ```bash
-swift run mneme models download          # accurate: Whisper large-v3, about 3 GB (default)
-swift run mneme models download fast     # large-v3 turbo, compressed, about 626 MB
+swift run mneme models download          # fast: large-v3 turbo, compressed, about 626 MB (default)
+swift run mneme models download accurate # Whisper large-v3 with the full decoder, about 3 GB
 swift run mneme models                   # what is installed
 ```
 
@@ -73,6 +74,7 @@ The examples below write `mneme` for short. Use `swift run mneme ...`, or build 
 
 ```bash
 mneme languages set en fr ar               # the languages you speak, most used first
+mneme languages mixed off                  # if you never switch languages within a recording (default: on)
 mneme glossary add "Sfax" "Dr. Ben Salah"  # names and terms to spell correctly
 mneme ingest ~/Desktop/memo.m4a --title "Monday ideas"
 mneme list
@@ -89,7 +91,7 @@ Supported audio formats are wav, m4a, mp3, aiff, caf and flac. Every command acc
 
 ## How recognition is made robust to accents
 
-1. **A large multilingual model.** Whisper large-v3, with its full 32-layer decoder, is the default (`--model accurate`). It was trained on a very large amount of multilingual audio from many kinds of speakers. `--model fast` trades a little robustness for several times the speed.
+1. **A large multilingual model.** Whisper large-v3 turbo is the default (`--model fast`): the large-v3 encoder, trained on a very large amount of multilingual audio from many kinds of speakers, with a 4-layer decoder. On this project's tests it matched the full large-v3 (`--model accurate`, 32-layer decoder) at 3–5 times the speed; see [Speed](#speed).
 2. **Language identification limited to your languages.** Accented speech is often taken for another language, and the whole recording is then transcribed in that language. For example, accented English may be detected as Hindi, or accented French as Arabic. With a profile (`mneme languages set ...`):
    - Mneme chooses only among your languages.
    - With a single language, it skips identification entirely.
@@ -113,6 +115,47 @@ Supported audio formats are wav, m4a, mp3, aiff, caf and flac. Every command acc
    - `mneme eval` then measures how well each model handles your accent.
 
    The same export is the starting point for fine-tuning later.
+
+## Speakers who switch languages
+
+Whisper decodes each window with one language token. When a sentence in another language falls in that window, Whisper tends to translate it into the window's language or to leave it out. Mneme used to identify one language per recording, so a recording that moved from French to English came back partly in the wrong language.
+
+With two or more languages in your profile, and `mneme languages mixed` on (the default):
+
+1. **Sentence windows.** The recording is cut at pauses into windows that hold about one sentence each: at least 2 seconds of speech, at most 28 seconds. The windows cover the whole recording, so nothing is skipped.
+2. **Identification inside the decoding pass, among your languages only.** WhisperKit builds its language filter from the tokenizer's list of language tokens. Mneme gives it a tokenizer that lists only your languages, so each window chooses among them during its normal decoding, with no extra pass over the audio.
+3. **A stable language per window.** Each window is first decoded greedily. Windows that need temperature fallback are decoded again in the language they were identified in: WhisperKit otherwise re-identifies the language at each fallback temperature by sampling, which moved one French and Arabic clip into English.
+4. **Stored per segment.** Each segment keeps the language it was decoded in. The transcript is labelled "mixed", with the language spoken longest. The app tags each passage with its language, and verified passages are exported with their own language.
+
+Code-switching test: 14 synthetic clips. Eleven switch between sentences in French, English, German and Arabic; three embed English words in a French or German sentence (`Scripts/make-codeswitch-samples.sh`).
+
+| Language identification | turbo WER | large-v3 WER |
+|---|---|---|
+| One per recording (before) | 24.7% | 11.1% |
+| One per sentence (now) | 2.5% | 2.1% |
+
+All eleven switching clips now come back with the right language for every sentence. The remaining errors are single words, mostly an English word inside a French sentence ("deadline"). Words of another language inside a sentence still depend on the model, because one sentence has one language token. On the monolingual accent set, identifying per sentence among ten languages kept WER at 1.1%.
+
+Turn it off (`mneme languages mixed off`, or the switch in Settings > Languages) if you never switch: one language is then identified for the whole recording.
+
+## Speed
+
+Measured on the development MacBook Pro (macOS 26), with the models already prepared:
+
+| | large-v3 | large-v3 turbo |
+|---|---|---|
+| English, 84 s recording, language known | 0.50 × real time | 0.14 × real time |
+| French, 68 s recording, language known | 0.87 × real time | 0.17 × real time |
+| English, 84 s, one language per sentence among four | 0.62 × real time | 0.18 × real time |
+| Accent set (37 clips), WER | 1.1% | 1.1% |
+
+Turbo is the default for that reason. The full large-v3 stays available as `--model accurate`, or as Accurate in Settings > Speech Model, for recordings turbo finds hard.
+
+Other speed-ups:
+
+- The language is identified inside the decoding pass instead of in a separate pass over the audio. On the short clips of the accent set this lowered turbo's real-time factor from 0.64 to 0.37.
+- The app keeps the model loaded and prepares it in the background. Loading a prepared model takes 2–3 seconds. The first load after a download takes several minutes while Core ML prepares the model for this Mac (7.5 minutes for turbo here, download included).
+- Windows are decoded eight at a time.
 
 ## How writes to the archive are kept correct
 
@@ -191,6 +234,8 @@ Check each dataset's licence before redistributing anything derived from it.
 `./Scripts/dev-loop.sh` re-runs `check.sh` whenever `.logs/request` changes. Leave it running in Terminal while changes are made from another session. Each run writes the full build and test output to `.logs/latest.log`, ending with `RESULT: PASS` or `RESULT: FAIL`.
 
 `check.sh` also runs the app's smoke test (`MnemeApp --smoke-test`): it exercises a temporary archive and renders every screen offscreen. When `.logs/request` contains `build-app`, a passing run also packages `build/Mneme.app`.
+
+Other request keywords: `turbo` measures large-v3 turbo against large-v3 (accent set and long recordings), and `codeswitch` runs the code-switching comparison above (`codeswitch-fast` for turbo only).
 
 When `.logs/request` contains `model-check`, `check.sh` also runs `Scripts/model-check.sh` after a passing build. That script runs the end-to-end test with Whisper tiny, downloads and prepares the accurate model, and runs the macOS-voices accent evaluation in both language modes. Its output goes to `.logs/model-check.log`, and the reports to `.logs/eval-say-*`.
 

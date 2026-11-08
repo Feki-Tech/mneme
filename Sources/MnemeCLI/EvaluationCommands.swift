@@ -3,6 +3,21 @@ import Foundation
 import MnemeCore
 import MnemeSpeech
 
+/// `LanguageStrategy` as a command-line value.
+enum LanguageStrategyOption: String, CaseIterable, ExpressibleByArgument {
+    case recording
+    case window
+    case sentence
+
+    var strategy: LanguageStrategy {
+        switch self {
+        case .recording: return .recording
+        case .window: return .window
+        case .sentence: return .sentence
+        }
+    }
+}
+
 enum EvalLanguageMode: String, CaseIterable, ExpressibleByArgument {
     case reference
     case detect
@@ -42,6 +57,12 @@ struct EvalCommand: AsyncParsableCommand {
     @Flag(name: .customLong("use-glossary"), help: "Pass the archive's glossary to the decoder.")
     var useGlossary = false
 
+    @Option(
+        name: .customLong("language-strategy"),
+        help: "In detect mode with two or more profile languages: recording (one language per recording), window (per 30-second window) or sentence (per sentence, for speakers who switch languages)."
+    )
+    var languageStrategy: LanguageStrategyOption = .window
+
     @Option(help: "Evaluate only the first N items.")
     var limit: Int?
 
@@ -75,7 +96,8 @@ struct EvalCommand: AsyncParsableCommand {
             engine: engine,
             languageMode: languageMode.evaluatorMode,
             languageProfile: profile,
-            glossary: glossary
+            glossary: glossary,
+            languageStrategy: languageStrategy.strategy
         )
 
         let outputFolder = outPath.map { Paths.url($0) } ?? Self.defaultOutputFolder(variant: model.profile.variant)
@@ -101,6 +123,7 @@ struct EvalCommand: AsyncParsableCommand {
         let settings: [(String, String)] = [
             ("Model", "\(model.profile.name) (\(model.profile.variant))"),
             ("Language mode", languageMode.rawValue),
+            ("Language strategy", languageStrategy.rawValue),
             ("Language profile", profile.isEmpty ? "none" : profile.joined(separator: ", ")),
             ("Glossary terms", String(glossary.count)),
             ("Manifest", Paths.url(manifest).lastPathComponent),

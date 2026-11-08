@@ -10,6 +10,8 @@ actor ArchiveWorker {
     private var profile: ModelProfile
     private var storeValue: ArchiveStore?
     private var pipelineValue: IngestPipeline?
+    /// The model load in progress, shared by everything that needs the model (one load at a time).
+    private var loadTask: Task<Void, Error>?
 
     init(archiveRoot: URL, modelsDirectory: URL, profile: ModelProfile) {
         self.archiveRoot = archiveRoot
@@ -43,6 +45,30 @@ actor ArchiveWorker {
         guard newProfile != profile else { return }
         profile = newProfile
         pipelineValue = nil
+        loadTask = nil
+    }
+
+    /// Loads the model once and keeps it in memory, so a recording is transcribed as soon as it is saved.
+    /// Concurrent callers wait for the same load.
+    func ensureModelLoaded() async throws {
+        let engine = try pipeline().engine
+        if engine.isLoaded {
+            return
+        }
+        if let loadTask {
+            return try await loadTask.value
+        }
+        let task = Task {
+            try await engine.load(allowDownload: false)
+        }
+        loadTask = task
+        do {
+            try await task.value
+            loadTask = nil
+        } catch {
+            loadTask = nil
+            throw error
+        }
     }
 
     func isModelReady() -> Bool {
@@ -122,8 +148,9 @@ actor ArchiveWorker {
         (try? store().entry(id: entryID)) != nil
     }
 
-    func transcribe(entryID: String, language: String?) async throws {
-        try await pipeline().transcribeEntry(entryID, language: language)
+    func transcribe(entryID: String, language: String?, progress: TranscriptionProgressHandler? = nil) async throws {
+        try await ensureModelLoaded()
+        try await pipeline().transcribeEntry(entryID, language: language, progress: progress)
     }
 
     func correct(entryID: String, segment: Int, text: String) throws -> CorrectionResult {
@@ -162,6 +189,14 @@ actor ArchiveWorker {
 
     func glossary() throws -> [String] {
         try store().glossary()
+    }
+
+    func mixedLanguages() throws -> Bool {
+        try store().mixedLanguages()
+    }
+
+    func setMixedLanguages(_ enabled: Bool) throws {
+        try store().setMixedLanguages(enabled)
     }
 
     func addGlossaryTerms(_ terms: [String]) throws {

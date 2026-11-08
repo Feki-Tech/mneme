@@ -261,9 +261,11 @@ struct ShowCommand: ParsableCommand {
             Console.out(String(format: "Processed in %.1f s", seconds))
         }
         Console.out("")
+        let mixed = transcript.language.source == .mixed
         for segment in transcript.segments {
             let marks = Format.flags(segment.flags)
-            Console.out("#\(segment.index)  \(Format.position(segment.start))–\(Format.position(segment.end))  \(segment.text)\(marks.isEmpty ? "" : "  " + marks)")
+            let tag = mixed ? "[\(segment.language ?? transcript.language.code)] " : ""
+            Console.out("#\(segment.index)  \(Format.position(segment.start))–\(Format.position(segment.end))  \(tag)\(segment.text)\(marks.isEmpty ? "" : "  " + marks)")
             if words {
                 for word in segment.words {
                     let probability = word.probability.map { String(format: " p=%.2f", $0) } ?? ""
@@ -424,7 +426,7 @@ struct LanguagesCommand: ParsableCommand {
             With a profile, Mneme chooses only among your languages; with a single language it skips \
             identification entirely.
             """,
-        subcommands: [SetProfile.self, Show.self, Clear.self],
+        subcommands: [SetProfile.self, Show.self, Clear.self, Mixed.self],
         defaultSubcommand: Show.self
     )
 
@@ -455,6 +457,41 @@ struct LanguagesCommand: ParsableCommand {
             Console.out(codes.isEmpty
                 ? "No language profile: any of Whisper's 100 languages can be identified. Set one with: mneme languages set en fr"
                 : "Language profile: \(LanguagesCommand.describe(codes))")
+        }
+    }
+
+    struct Mixed: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "mixed",
+            abstract: "Whether you switch languages within a recording (on by default).",
+            discussion: """
+                On: with two or more languages in the profile, each sentence gets its own language, so a \
+                recording that switches from French to English is transcribed in both. Off: one language for \
+                the whole recording, a little faster.
+                """
+        )
+
+        @Argument(help: "on or off (omit to show the current setting).")
+        var value: String?
+
+        @OptionGroup var archive: ArchiveOptions
+
+        func run() throws {
+            let store = try archive.open()
+            if let value {
+                switch value.lowercased() {
+                case "on", "yes", "true", "1":
+                    try store.setMixedLanguages(true)
+                case "off", "no", "false", "0":
+                    try store.setMixedLanguages(false)
+                default:
+                    throw ValidationError("Use on or off.")
+                }
+            }
+            let enabled = try store.mixedLanguages()
+            Console.out(enabled
+                ? "Mixed languages: on (each sentence gets its own language)."
+                : "Mixed languages: off (one language per recording).")
         }
     }
 

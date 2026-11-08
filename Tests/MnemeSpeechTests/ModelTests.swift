@@ -1,4 +1,5 @@
 import Foundation
+import MnemeCore
 import XCTest
 @testable import MnemeSpeech
 
@@ -12,7 +13,7 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(custom.isMultilingual)
         XCTAssertFalse(ModelProfile.resolve("small.en").isMultilingual)
         XCTAssertFalse(ModelProfile.resolve("small.en_217MB").isMultilingual)
-        XCTAssertEqual(ModelProfile.defaultProfile, .accurate)
+        XCTAssertEqual(ModelProfile.defaultProfile, .fast)
     }
 
     func testLocatorFindsOnlyCompleteFoldersAndTracksReadiness() throws {
@@ -64,5 +65,21 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(WhisperEngine.mostCommon(["fr", "<|en|>", "en", "fr"]), "en")
         XCTAssertEqual(WhisperEngine.mostCommon(["ar", "ar", "fr"]), "ar")
         XCTAssertNil(WhisperEngine.mostCommon(["", " "]))
+    }
+
+    func testTheTranscriptLanguageReflectsEveryWindow() {
+        var french = TranscribedSegment(index: 0, start: 0, end: 6, text: "Bonjour.")
+        french.language = "fr"
+        var english = TranscribedSegment(index: 1, start: 6, end: 8, text: "Hello.")
+        english.language = "en"
+        let mixed = WhisperEngine.languageDecision(for: [french, english], windowLanguages: ["fr", "en"], allowed: ["en", "fr"])
+        XCTAssertEqual(mixed.code, "fr")
+        XCTAssertEqual(mixed.source, .mixed)
+        XCTAssertEqual(mixed.probability ?? 0, 0.75, accuracy: 0.001)
+
+        let single = WhisperEngine.languageDecision(for: [french], windowLanguages: ["fr"], allowed: ["en", "fr"])
+        XCTAssertEqual(single, LanguageDecision(code: "fr", probability: nil, source: .constrained))
+        let silent = WhisperEngine.languageDecision(for: [], windowLanguages: [], allowed: ["de", "fr"])
+        XCTAssertEqual(silent, LanguageDecision(code: "de", probability: nil, source: .fallback))
     }
 }

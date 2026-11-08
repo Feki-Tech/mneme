@@ -123,6 +123,41 @@ final class ArchiveEntriesTests: XCTestCase {
         XCTAssertEqual(segment?.text, "Placed after the end.")
     }
 
+    func testSegmentLanguagesOfAMixedRecordingAreStoredAndExported() throws {
+        let audio = try makeAudio()
+        var french = Fixtures.segment(0, 0, 1.8, "Ce matin, j'ai relu le chapitre.")
+        french.language = "fr"
+        var english = Fixtures.segment(1, 1.9, 2.9, "Then I sent it.")
+        english.language = "EN"
+        let transcript = Transcript(
+            language: LanguageDecision(code: "en", probability: 0.5, source: .mixed),
+            segments: [french, english],
+            provenance: Provenance(engine: "test-engine", modelID: "test-model")
+        )
+        let result = try store.ingestVoice(audio, transcript: transcript)
+        let stored = try XCTUnwrap(try store.entryDetails(id: result.entry.id).transcript?.transcript)
+        XCTAssertEqual(stored.segments.map { $0.language }, ["fr", "en"])
+        XCTAssertEqual(stored.language.source, .mixed)
+        XCTAssertEqual(stored.language.code, "fr", "The language spoken longest labels the transcript")
+        XCTAssertEqual(stored.language.probability ?? 0, 1.8 / 2.8, accuracy: 0.001)
+        XCTAssertEqual(try store.entry(id: result.entry.id)?.language, "fr")
+
+        _ = try store.correctSegment(entryID: result.entry.id, segmentIndex: 1, text: "Then I sent it to London.")
+        let corrected = try XCTUnwrap(try store.entryDetails(id: result.entry.id).transcript?.transcript)
+        XCTAssertEqual(corrected.segments[1].language, "en", "A correction keeps the segment's language")
+        XCTAssertEqual(try store.verifiedSegments().map { $0.language }, ["en"])
+    }
+
+    func testTheMixedLanguagesSettingChoosesTheStrategy() throws {
+        XCTAssertTrue(try store.mixedLanguages())
+        XCTAssertEqual(try store.languageStrategy(), .sentence)
+        try store.setMixedLanguages(false)
+        XCTAssertFalse(try store.mixedLanguages())
+        XCTAssertEqual(try store.languageStrategy(), .recording)
+        try store.setMixedLanguages(true)
+        XCTAssertEqual(try store.languageStrategy(), .sentence)
+    }
+
     func testRenamingUpdatesTitlesAndTheNoteIndex() throws {
         let audio = try makeAudio()
         let voice = try store.ingestAudio(audio)

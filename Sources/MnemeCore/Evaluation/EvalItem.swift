@@ -58,6 +58,8 @@ public struct EvalResult: Codable, Equatable, Sendable {
     public var flaggedSegments: Int
     public var audioSeconds: Double?
     public var processingSeconds: Double?
+    /// The languages the segments were decoded in, in order of appearance (consecutive repeats merged).
+    public var segmentLanguages: [String]?
     /// Set when the item could not be transcribed; such items are excluded from error rates and counted as failed.
     public var error: String?
 
@@ -71,6 +73,7 @@ public struct EvalResult: Codable, Equatable, Sendable {
         flaggedSegments: Int = 0,
         audioSeconds: Double? = nil,
         processingSeconds: Double? = nil,
+        segmentLanguages: [String]? = nil,
         error: String? = nil
     ) {
         self.item = item
@@ -82,6 +85,7 @@ public struct EvalResult: Codable, Equatable, Sendable {
         self.flaggedSegments = flaggedSegments
         self.audioSeconds = audioSeconds
         self.processingSeconds = processingSeconds
+        self.segmentLanguages = segmentLanguages
         self.error = error
     }
 

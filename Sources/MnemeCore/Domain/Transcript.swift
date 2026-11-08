@@ -64,6 +64,9 @@ public struct TranscribedSegment: Codable, Equatable, Sendable {
     public var temperature: Double?
     public var words: [TranscribedWord]
     public var flags: Set<QualityFlag>
+    /// The language this passage was decoded in, when the recording was identified passage by passage
+    /// (speakers who switch languages). Nil means the transcript's language.
+    public var language: String?
 
     public init(
         index: Int,
@@ -75,7 +78,8 @@ public struct TranscribedSegment: Codable, Equatable, Sendable {
         noSpeechProb: Double? = nil,
         temperature: Double? = nil,
         words: [TranscribedWord] = [],
-        flags: Set<QualityFlag> = []
+        flags: Set<QualityFlag> = [],
+        language: String? = nil
     ) {
         self.index = index
         self.start = start
@@ -87,6 +91,7 @@ public struct TranscribedSegment: Codable, Equatable, Sendable {
         self.temperature = temperature
         self.words = words
         self.flags = flags
+        self.language = language
     }
 }
 
@@ -105,6 +110,9 @@ public struct LanguageDecision: Codable, Equatable, Sendable {
         case model
         /// No usable detection; the first language of the profile.
         case fallback
+        /// Several languages: each segment carries the language it was decoded in; `code` is the language
+        /// spoken longest and `probability` its share of the speech.
+        case mixed
     }
 
     public var code: String
@@ -155,6 +163,17 @@ public struct Transcript: Codable, Equatable, Sendable {
 
     public var text: String {
         TextJoiner.join(segments.map(\.text), language: language.code)
+    }
+
+    /// Seconds of speech per language, longest first. Segments without a language count for the transcript's.
+    public var speechByLanguage: [(code: String, seconds: Double)] {
+        var totals: [String: Double] = [:]
+        for segment in segments {
+            totals[segment.language ?? language.code, default: 0] += max(0, segment.end - segment.start)
+        }
+        return totals.map { (code: $0.key, seconds: $0.value) }.sorted { lhs, rhs in
+            lhs.seconds != rhs.seconds ? lhs.seconds > rhs.seconds : lhs.code < rhs.code
+        }
     }
 
     /// Segments waiting for review: a quality warning, and not verified by the user yet.

@@ -158,6 +158,27 @@ final class TranscriptSanitizerTests: XCTestCase {
         XCTAssertEqual(output.flaggedSegmentCount, 1)
     }
 
+    func testSegmentLanguagesAreValidatedAndAMixedTranscriptIsRelabelled() throws {
+        var french = Fixtures.segment(0, 0, 3, "Bonjour à tous.")
+        french.language = "<|fr|>"
+        var english = Fixtures.segment(1, 3, 4, "Hello.")
+        english.language = "en"
+        var unknown = Fixtures.segment(2, 4, 5, "Hm.")
+        unknown.language = "xx"
+        let input = Transcript(
+            language: LanguageDecision(code: "en", probability: 0.9, source: .mixed),
+            segments: [french, english, unknown],
+            provenance: Provenance(engine: "test-engine", modelID: "test-model")
+        )
+        let (once, _) = try sanitizer.sanitize(input, duration: 5)
+        XCTAssertEqual(once.segments.map { $0.language }, ["fr", "en", nil])
+        XCTAssertEqual(once.language.code, "fr")
+        XCTAssertEqual(once.language.probability ?? 0, 0.75, accuracy: 0.001)
+        XCTAssertEqual(once.speechByLanguage.map { $0.code }, ["fr", "en"])
+        let (twice, _) = try sanitizer.sanitize(once, duration: 5)
+        XCTAssertEqual(twice, once, "Sanitising is idempotent")
+    }
+
     func testUserVerifiedSegmentsKeepOnlyTheirFlag() throws {
         var segment = Fixtures.segment(0, 0, 2, "Verified.")
         segment.avgLogprob = -3
