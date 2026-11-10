@@ -1,0 +1,25 @@
+# Weekly dependency updates. A WhisperKit update changes the speech pipeline: its pull request runs CI and the
+# model-eval workflow (absolute bars); run `bash Scripts/model-check.sh gate` on the Mac before merging it.
+version: 2
+updates:
+  - package-ecosystem: swift
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      swift-packages:
+        patterns: ["*"]
+    commit-message:
+      prefix: deps
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci

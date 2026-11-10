@@ -1,0 +1,120 @@
+name: model-eval
+
+# The champion/challenger gate for the speech pipeline (docs/MLOPS.md), Mneme's counterpart of ai-gym-coach's
+# model-gate.yml and coach-eval.yml: real Whisper models on a macOS runner, the canonical evaluation suites
+# (Scripts/model-check.sh gate), the reports in the job summary, and `mneme eval --gate` against the committed
+# baselines in Evaluation/baselines/. Nothing is promoted automatically; the run is evidence for a human decision.
+#
+# The runner's voices are not those of the Mac that produced the baselines, so the dataset fingerprints differ and
+# the gate applies its absolute bars here (no failed items, overall WER at most 10 %). The relative comparison runs
+# where the baselines' data lives: `bash Scripts/model-check.sh gate` on that Mac. Runs weekly (upstream models
+# and toolchains drift), on demand, and on pull requests that touch the speech pipeline or its dependencies.
+
+on:
+  schedule:
+    - cron: "40 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      models:
+        description: "Models to evaluate"
+        type: choice
+        options: ["fast", "fast accurate"]
+        default: "fast"
+  pull_request:
+    branches: [main]
+    paths:
+      - Package.resolved
+      - Package.swift
+      - Sources/MnemeSpeech/**
+      - Sources/MnemeCore/Audio/**
+      - Sources/MnemeCore/Evaluation/**
+      - Sources/MnemeCore/Language/**
+      - Sources/MnemeCore/Metrics/**
+      - Sources/MnemeCore/Quality/**
+      - Scripts/model-check.sh
+      - Scripts/make-say-samples.sh
+      - Scripts/make-codeswitch-samples.sh
+      - Evaluation/baselines/**
+      - .github/workflows/model-eval.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    name: Evaluation suites and gate
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      MODELS: ${{ inputs.models || 'fast' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Toolchain
+        id: toolchain
+        run: |
+          sw_vers
+          swift --version
+          echo "key=$(swift --version 2>&1 | head -n 1 | shasum | cut -c 1-12)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SwiftPM
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .build
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-release-${{ runner.arch }}-${{ steps.toolchain.outputs.key }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: spm-release-${{ runner.arch }}-${{ steps.toolchain.outputs.key }}-
+
+      # Downloads happen once per model set; the manifest written on first use travels with the cached files.
+      - name: Cache speech models
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Application Support/Mneme/Models
+          key: whisper-models-${{ runner.arch }}-${{ env.MODELS }}-v1
+
+      - name: Dependencies resolve from Package.resolved only
+        run: swift package resolve --force-resolved-versions
+
+      - name: Evaluation suites and gate
+        run: |
+          mkdir -p .logs
+          if [ "$MODELS" = "fast accurate" ]; then request="gate accurate"; else request="gate"; fi
+          bash Scripts/model-check.sh "$request" 2>&1 | tee .logs/model-eval.log
+          exit "${PIPESTATUS[0]}"
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "# Speech model evaluation (${MODELS})"
+            echo
+            for gate in .logs/gate-*/gate.md; do
+              [ -f "$gate" ] || continue
+              cat "$gate"
+              echo
+            done
+            for report in .logs/gate-*/report.md; do
+              [ -f "$report" ] || continue
+              echo "<details><summary>$(dirname "$report")</summary>"
+              echo
+              cat "$report"
+              echo
+              echo "</details>"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: model-eval-${{ github.run_id }}
+          path: |
+            .logs/gate-*/
+            .logs/*.log
+          if-no-files-found: ignore
+          retention-days: 30

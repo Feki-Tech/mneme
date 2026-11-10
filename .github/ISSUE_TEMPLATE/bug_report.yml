@@ -1,0 +1,46 @@
+name: Bug report
+description: Something does not work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the report. **Do not attach recordings, transcripts or notes from your archive**: they are
+        private, and an issue is public. Describe the problem in your own words, or reproduce it with a synthetic
+        recording (for example one made with `say`).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. …\n2. …"
+  - type: input
+    id: version
+    attributes:
+      label: Mneme version
+      description: "`mneme --version`, or the version in the app's About window."
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: macOS version and chip
+      placeholder: "macOS 26.5.2, Apple M3"
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Speech model and fingerprint
+      description: "From `mneme models list` (for example `fast`, fingerprint `3f2a9c1b7d4e`), if transcription is involved."
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error messages
+      description: Copy the error text only. Remove anything personal.
+      render: text

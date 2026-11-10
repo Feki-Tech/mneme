@@ -1,0 +1,143 @@
+name: Release
+
+# Tag-driven releases, Mneme's counterpart of ai-gym-coach's `android-v*` releases and TestFlight upload:
+#
+#   1. bump MnemeVersion.current (Sources/MnemeCore/Support/Version.swift) and CHANGELOG.md, merge to main
+#   2. git tag v0.2.0 && git push origin v0.2.0
+#
+# The runner checks that the tag matches the version, runs the full check (a release never outruns its tests),
+# builds Mneme.app and the `mneme` tool, and attaches both with SHA-256 checksums and build-provenance attestations
+# to a GitHub Release.
+#
+# Signing: when the Developer ID secrets below exist, both are signed with a hardened runtime and notarised; without
+# them they are signed ad hoc and macOS asks the user to confirm the first launch. Optional repository secrets:
+#   MACOS_CERTIFICATE_P12        base64 of the "Developer ID Application" certificate with its private key
+#   MACOS_CERTIFICATE_PASSWORD   its password
+#   MACOS_SIGN_IDENTITY          "Developer ID Application: Name (TEAMID)"
+#   NOTARY_KEY_ID, NOTARY_ISSUER_ID, NOTARY_KEY_P8   an App Store Connect API key for notarytool
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: The tag matches MnemeVersion.current
+        run: |
+          version=$(sed -n 's/.*static let current = "\([0-9][0-9.]*\)".*/\1/p' Sources/MnemeCore/Support/Version.swift | head -n 1)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match MnemeVersion.current ($version): bump Sources/MnemeCore/Support/Version.swift first."
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Dependencies resolve from Package.resolved only
+        run: swift package resolve --force-resolved-versions
+
+      - name: Full check
+        run: bash Scripts/check.sh
+
+      - name: Show the full log
+        if: failure()
+        run: tail -n 400 .logs/latest.log || true
+
+      - name: Signing identity
+        id: signing
+        env:
+          P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          if [ -z "$P12" ] || [ -z "$IDENTITY" ]; then
+            echo "identity=-" >> "$GITHUB_OUTPUT"
+            echo "No Developer ID secrets: this release is signed ad hoc and is not notarised." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          password=$(uuidgen)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          echo "identity=$IDENTITY" >> "$GITHUB_OUTPUT"
+
+      - name: Build Mneme.app
+        env:
+          MNEME_BUILD_NUMBER: ${{ github.run_number }}
+          MNEME_SIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
+        run: MNEME_VERSION="$VERSION" bash Scripts/build-app.sh
+
+      - name: Build the mneme tool
+        env:
+          IDENTITY: ${{ steps.signing.outputs.identity }}
+        run: |
+          swift build -c release --product mneme
+          mkdir -p dist
+          cp "$(swift build -c release --show-bin-path)/mneme" dist/mneme
+          if [ "$IDENTITY" = "-" ]; then
+            codesign --force --sign - dist/mneme
+          else
+            codesign --force --options runtime --timestamp --sign "$IDENTITY" dist/mneme
+          fi
+          dist/mneme --version
+
+      - name: Package
+        run: |
+          ditto -c -k --keepParent build/Mneme.app "dist/Mneme-$VERSION-macos-arm64.zip"
+          (cd dist && zip -q "mneme-$VERSION-macos-arm64.zip" mneme && rm mneme)
+
+      - name: Notarise
+        if: steps.signing.outputs.identity != '-'
+        env:
+          KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          ISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
+          KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+        run: |
+          if [ -z "$KEY_ID" ] || [ -z "$ISSUER" ] || [ -z "$KEY_P8" ]; then
+            echo "No notary key: signed with Developer ID but not notarised." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          key="$RUNNER_TEMP/notary.p8"
+          printf '%s' "$KEY_P8" > "$key"
+          for archive in dist/*.zip; do
+            xcrun notarytool submit "$archive" --key "$key" --key-id "$KEY_ID" --issuer "$ISSUER" --wait
+          done
+          rm -f "$key"
+          # The ticket is stapled into the app so it opens offline; the zip is rebuilt around the stapled app.
+          xcrun stapler staple build/Mneme.app
+          rm "dist/Mneme-$VERSION-macos-arm64.zip"
+          ditto -c -k --keepParent build/Mneme.app "dist/Mneme-$VERSION-macos-arm64.zip"
+
+      - name: Checksums
+        run: |
+          cd dist
+          shasum -a 256 ./*.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.zip
+
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "Mneme $VERSION" --generate-notes --verify-tag

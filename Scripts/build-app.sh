@@ -1,7 +1,13 @@
 #!/bin/bash
 # Packages the macOS app as build/Mneme.app: release build, Info.plist with the microphone usage text,
-# ad-hoc signature for this Mac, then the offscreen smoke test from inside the bundle.
+# signature, then the offscreen smoke test from inside the bundle.
 # Usage: bash Scripts/build-app.sh
+#
+# Environment (all optional; the release workflow sets them):
+#   MNEME_VERSION        version string (default: MnemeVersion.current in Sources/MnemeCore/Support/Version.swift)
+#   MNEME_BUILD_NUMBER   CFBundleVersion (default: the date and time)
+#   MNEME_SIGN_IDENTITY  a "Developer ID Application" identity: hardened runtime, secure timestamp and the
+#                        microphone entitlement, ready for notarisation. Default "-": ad hoc, for this Mac.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -10,9 +16,10 @@ swift build -c release --product MnemeApp
 BIN_DIR=$(swift build -c release --show-bin-path)
 
 APP=build/Mneme.app
-VERSION=$(sed -n 's/.*version: "\([0-9][0-9.]*\)".*/\1/p' Sources/MnemeCLI/MnemeCommand.swift | head -n 1)
-VERSION=${VERSION:-0.1.0}
-BUILD_NUMBER=$(date +%Y%m%d%H%M)
+SOURCE_VERSION=$(sed -n 's/.*static let current = "\([0-9][0-9.]*\)".*/\1/p' Sources/MnemeCore/Support/Version.swift | head -n 1)
+VERSION=${MNEME_VERSION:-${SOURCE_VERSION:-0.0.0}}
+BUILD_NUMBER=${MNEME_BUILD_NUMBER:-$(date +%Y%m%d%H%M)}
+SIGN_IDENTITY=${MNEME_SIGN_IDENTITY:--}
 
 echo "== assembling $APP (version $VERSION, build $BUILD_NUMBER)"
 rm -rf "$APP"
@@ -68,8 +75,26 @@ for bundle in "$BIN_DIR"/*.bundle; do
   echo "warning: resource bundle $(basename "$bundle") exists in the build folder and is not packaged"
 done
 
-echo "== signing (ad hoc, for this Mac)"
-codesign --force --sign - "$APP"
+if [ "$SIGN_IDENTITY" = "-" ]; then
+  echo "== signing (ad hoc, for this Mac)"
+  codesign --force --sign - "$APP"
+else
+  # The hardened runtime blocks the microphone unless the app declares it needs audio input.
+  ENTITLEMENTS=$(mktemp -t mneme-entitlements)
+  cat > "$ENTITLEMENTS" <<'ENT'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+</dict>
+</plist>
+ENT
+  echo "== signing with \"$SIGN_IDENTITY\" (hardened runtime)"
+  codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$APP"
+  rm -f "$ENTITLEMENTS"
+fi
 codesign --verify --strict --verbose=1 "$APP"
 
 echo "== smoke test from the bundle"

@@ -1,0 +1,135 @@
+name: CI
+
+# Every push and pull request: dependencies come from Package.resolved only (the lockfile discipline of
+# ai-gym-coach's uv.lock), the package builds, unit and property tests pass, the command-line tool and the app
+# pass their smoke tests, and every screen of the app is rendered for review. Model evaluations need the real
+# models and run in model-eval.yml. On main, a test-gated Mneme.app is published as a build artifact.
+
+on:
+  push:
+    branches: ["**"]
+    tags-ignore: ["**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  lint:
+    name: Lint scripts, data and workflows
+    # A pull request from a branch of this repository was already checked when the branch was pushed.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Shell scripts parse and pass ShellCheck
+        run: |
+          for script in Scripts/*.sh; do bash -n "$script"; done
+          shellcheck --severity=error Scripts/*.sh
+
+      - name: Python scripts compile
+        run: python3 -m py_compile Scripts/*.py
+
+      - name: Committed JSON is valid
+        run: find . -name '*.json' -not -path './.git/*' -print0 | xargs -0 -r -n 1 python3 -m json.tool > /dev/null
+
+      - name: Workflows pass actionlint
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color
+
+  test:
+    name: Build, test and smoke-test (macOS)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Toolchain
+        id: toolchain
+        run: |
+          sw_vers
+          xcode-select -p
+          swift --version
+          echo "key=$(swift --version 2>&1 | head -n 1 | shasum | cut -c 1-12)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SwiftPM
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .build
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-debug-${{ runner.arch }}-${{ steps.toolchain.outputs.key }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: spm-debug-${{ runner.arch }}-${{ steps.toolchain.outputs.key }}-
+
+      - name: Dependencies resolve from Package.resolved only
+        run: swift package resolve --force-resolved-versions
+
+      - name: Build, unit and property tests, CLI and app smoke tests
+        run: bash Scripts/check.sh
+
+      - name: Show the full log
+        if: failure()
+        run: tail -n 400 .logs/latest.log || true
+
+      - name: Package.resolved is unchanged
+        run: git diff --exit-code Package.resolved
+
+      - name: Upload the log and screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: check-${{ github.sha }}
+          path: |
+            .logs/latest.log
+            .logs/screens
+          if-no-files-found: ignore
+          retention-days: 14
+
+  app:
+    name: Package Mneme.app
+    needs: test
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Toolchain
+        id: toolchain
+        run: echo "key=$(swift --version 2>&1 | head -n 1 | shasum | cut -c 1-12)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SwiftPM
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .build
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-release-${{ runner.arch }}-${{ steps.toolchain.outputs.key }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: spm-release-${{ runner.arch }}-${{ steps.toolchain.outputs.key }}-
+
+      - name: Release build, ad hoc signature, smoke test from the bundle
+        env:
+          MNEME_BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          swift package resolve --force-resolved-versions
+          bash Scripts/build-app.sh
+
+      - name: Archive
+        run: ditto -c -k --keepParent build/Mneme.app "build/Mneme-${GITHUB_SHA::7}.zip"
+
+      - name: Upload Mneme.app
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Mneme-app-${{ github.sha }}
+          path: build/Mneme-*.zip
+          retention-days: 30
