@@ -1,5 +1,8 @@
 # Mneme: on-device voice archive
 
+[![CI](https://github.com/Feki-Tech/mneme/actions/workflows/ci.yml/badge.svg)](https://github.com/Feki-Tech/mneme/actions/workflows/ci.yml)
+[![model-eval](https://github.com/Feki-Tech/mneme/actions/workflows/model-eval.yml/badge.svg)](https://github.com/Feki-Tech/mneme/actions/workflows/model-eval.yml)
+
 Mneme is a Mac app for recording thoughts and writing notes, with the engine behind it also available as a command-line tool:
 
 - **The app.** Record, play back, review the passages the recogniser was unsure about, write and edit notes, search everything.
@@ -20,8 +23,8 @@ Nothing leaves your Mac. The network is used only to download a speech model, an
 ```bash
 cd ~/Documents/Mneme
 swift build
-swift test                 # unit tests; no model or network needed
-bash Scripts/check.sh      # build + tests + CLI and app smoke tests, log in .logs/latest.log
+swift test                 # unit and property tests; no model or network needed
+bash Scripts/check.sh      # build + tests + CLI and app smoke tests, log in .logs/latest.log (what CI runs)
 ```
 
 The first build downloads the Swift packages (WhisperKit and swift-argument-parser) from GitHub.
@@ -59,12 +62,15 @@ Each download is something you choose, and you see its size before it starts:
 ```bash
 swift run mneme models download          # fast: large-v3 turbo, compressed, about 626 MB (default)
 swift run mneme models download accurate # Whisper large-v3 with the full decoder, about 3 GB
-swift run mneme models                   # what is installed
+swift run mneme models                   # what is installed, with each model's fingerprint
+swift run mneme models verify            # re-hash every installed model against its manifest
 ```
 
 Models come from `huggingface.co/argmaxinc/whisperkit-coreml` and are stored in `~/Library/Application Support/Mneme/Models`.
 
 After the download, the model is loaded once. This caches the tokenizer and lets Core ML compile the model for your Mac, which can take several minutes. From then on, Mneme works fully offline.
+
+On that first load Mneme also writes a manifest with the SHA-256 of every model file. Each transcript records the resulting fingerprint, so you can always tell which model files produced a text, and each later load checks that the files are unchanged.
 
 Other commands never download anything unless you pass `--allow-download`.
 
@@ -84,6 +90,7 @@ mneme correct 9c41e2ab 2 "Please call Stella tomorrow."
 mneme note "Idée pour le livre : commencer par la mer." --title "Livre"
 mneme delete 9c41e2ab --yes                # permanent, with its recording and history
 mneme verify                               # database, search index and recording checksums
+mneme models quality                       # per model: speed, uncertain passages, your corrections
 mneme paths
 ```
 
@@ -204,6 +211,9 @@ Each run writes these files to `./mneme-eval/<date>-<model>/`:
 - `results.jsonl`: one line per utterance, written as the run goes.
 - `summary.json`
 - `report.md`: overall WER, CER, language errors and speed, then each accent, region and language, worst first.
+- `report.json`: the summary with everything needed to compare it with another run: model fingerprint, decoding settings, dataset fingerprint, Mneme version and machine.
+
+With `--gate <report.json>`, the run is compared with a baseline and the command exits 0 (passed), 1 (refused: a regression or a missed bar, listed in `gate.md`) or 2 (error). The baselines for the canonical suites are in [Evaluation/](Evaluation/README.md).
 
 Error rates are micro-averaged after removing case, punctuation and annotations. For languages written without spaces, read CER rather than WER.
 
@@ -229,23 +239,35 @@ Check each dataset's licence before redistributing anything derived from it.
   Models/             WhisperKit models
 ```
 
+## Quality, CI and releases
+
+How Mneme is built, tested, evaluated and released is described in [docs/MLOPS.md](docs/MLOPS.md). In short:
+
+- **Every push** runs [CI](.github/workflows/ci.yml) on a macOS runner: dependencies from `Package.resolved` only, `Scripts/check.sh`, and screenshots of every screen. Pushes to `main` also produce a test-gated `Mneme.app`.
+- **Speech-pipeline changes** pass the evaluation gate: `bash Scripts/model-check.sh gate` on a Mac, and the [model-eval](.github/workflows/model-eval.yml) workflow with real models on GitHub's runners (weekly, on demand, and for pull requests that touch the pipeline).
+- **Releases** are cut by pushing a tag that matches `MnemeVersion.current`, for example `v0.1.0`: the [release workflow](.github/workflows/release.yml) tests, builds the app and the `mneme` tool, and publishes them with checksums and build-provenance attestations.
+- Changes are listed in [CHANGELOG.md](CHANGELOG.md); vulnerabilities are reported as described in [SECURITY.md](SECURITY.md).
+
 ## Development loop
 
 `./Scripts/dev-loop.sh` re-runs `check.sh` whenever `.logs/request` changes. Leave it running in Terminal while changes are made from another session. Each run writes the full build and test output to `.logs/latest.log`, ending with `RESULT: PASS` or `RESULT: FAIL`.
 
 `check.sh` also runs the app's smoke test (`MnemeApp --smoke-test`): it exercises a temporary archive and renders every screen offscreen. When `.logs/request` contains `build-app`, a passing run also packages `build/Mneme.app`.
 
-Other request keywords: `turbo` measures large-v3 turbo against large-v3 (accent set and long recordings), and `codeswitch` runs the code-switching comparison above (`codeswitch-fast` for turbo only).
+Other request keywords: `turbo` measures large-v3 turbo against large-v3 (accent set and long recordings), `codeswitch` runs the code-switching comparison above (`codeswitch-fast` for turbo only), `gate` runs the canonical suites against the committed baselines, and `baseline` writes new baselines from a real run (add `accurate` to include the second model).
 
 When `.logs/request` contains `model-check`, `check.sh` also runs `Scripts/model-check.sh` after a passing build. That script runs the end-to-end test with Whisper tiny, downloads and prepares the accurate model, and runs the macOS-voices accent evaluation in both language modes. Its output goes to `.logs/model-check.log`, and the reports to `.logs/eval-say-*`.
 
 ## Layout
 
 ```
-Sources/MnemeCore     archive, validation, language policy, metrics, evaluation (no third-party dependencies)
+Sources/MnemeCore     archive, validation, language policy, metrics, evaluation, model manifests (no third-party dependencies)
 Sources/MnemeSpeech   WhisperKit engine, model management, ingest pipeline, accent evaluator
 Sources/MnemeCLI      the `mneme` command
 Sources/MnemeApp      the SwiftUI app (packaged by Scripts/build-app.sh)
-Tests/                unit tests and the opt-in end-to-end test
-Scripts/              build loop, sample generation, dataset export
+Tests/                unit and property tests, and the opt-in end-to-end test
+Scripts/              build loop, model checks and evaluation suites, sample generation, dataset export
+Evaluation/           committed evaluation baselines
+docs/                 MLOps and DevOps practices
+.github/              CI, model evaluation and release workflows, Dependabot, templates
 ```
