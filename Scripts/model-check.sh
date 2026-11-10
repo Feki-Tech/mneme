@@ -9,6 +9,12 @@
 # glossary-check:
 #   Re-runs the accent smoke test with names from the first report in a scratch archive's glossary,
 #   to confirm that the glossary prompt fixes names without harming other transcriptions.
+# baseline / gate (docs/MLOPS.md):
+#   The canonical evaluation suites (accents in the reference language, accents with language detection,
+#   code-switching per sentence) with the default model, or also the accurate one when the request says
+#   "accurate". "baseline" stores each run's report.json in Evaluation/baselines/ (review the diff, then commit;
+#   never edit a baseline by hand). "gate" runs the same suites with `mneme eval --gate` against those baselines
+#   and fails on any regression. Also used by the model-eval workflow on GitHub Actions.
 #
 # Downloads happen only in model-check, and only the first time, from huggingface.co/argmaxinc/whisperkit-coreml
 # into ~/Library/Application Support/Mneme/Models: tiny (about 75 MB) and large-v3 (about 3 GB).
@@ -24,13 +30,15 @@ finish() {
 }
 want() { [[ "$MODE" == *"$1"* ]]; }
 # "model-check" runs everything except the glossary and probe runs; "e2e", "glossary" and "probe" select single steps.
-RUN_E2E=0; RUN_DOWNLOAD=0; RUN_EVAL=0; RUN_GLOSSARY=0; RUN_PROBE=0; RUN_TURBO=0; RUN_CODESWITCH=0
+RUN_E2E=0; RUN_DOWNLOAD=0; RUN_EVAL=0; RUN_GLOSSARY=0; RUN_PROBE=0; RUN_TURBO=0; RUN_CODESWITCH=0; RUN_SUITES=""
 if want model-check; then RUN_E2E=1; RUN_DOWNLOAD=1; RUN_EVAL=1; fi
 if want e2e; then RUN_E2E=1; fi
 if want glossary; then RUN_GLOSSARY=1; fi
 if want probe; then RUN_PROBE=1; fi
 if want turbo; then RUN_TURBO=1; fi
 if want codeswitch; then RUN_CODESWITCH=1; fi
+if want baseline; then RUN_SUITES=baseline; fi
+if want gate; then RUN_SUITES=gate; fi
 
 if [ $RUN_E2E -eq 1 ]; then
   step "end-to-end test (Whisper tiny)"
@@ -177,6 +185,62 @@ PY
   for log in .logs/eval-cs-*-sentence.log; do
     echo "--- $log"
     grep -E "WER|LANGUAGE|error" "$log" | head -n 20
+  done
+fi
+
+
+if [ -n "$RUN_SUITES" ]; then
+  # Canonical suites: the same data, settings and models every time, so runs can be compared. Samples are
+  # generated once and reused: their audio is part of each report's dataset fingerprint.
+  SUITE_MODELS="fast"
+  if want accurate; then SUITE_MODELS="fast accurate"; fi
+  if [ ! -s eval/cs/manifest.jsonl ] || ! grep -q '"languages"' eval/cs/manifest.jsonl; then
+    step "code-switching samples"
+    bash ./Scripts/make-codeswitch-samples.sh eval/cs 2>&1 || status=1
+  fi
+  SUITE_ARCHIVE=.logs/suite-archive
+  $BIN languages set fr en de ar --archive "$SUITE_ARCHIVE" > /dev/null 2>&1 || status=1
+  mkdir -p Evaluation/baselines
+  for model in $SUITE_MODELS; do
+    step "prepare the $model model"
+    if $BIN models download "$model" > ".logs/prepare-$model.log" 2>&1; then
+      tail -n 1 ".logs/prepare-$model.log"
+    else
+      status=1
+      tail -n 5 ".logs/prepare-$model.log"
+    fi
+    for suite in say-reference say-detect codeswitch-sentence; do
+      case "$suite" in
+        say-reference) manifest=eval/say/manifest.jsonl; args=(--language-mode reference) ;;
+        say-detect) manifest=eval/say/manifest.jsonl; args=(--language-mode detect) ;;
+        codeswitch-sentence)
+          manifest=eval/cs/manifest.jsonl
+          args=(--language-mode detect --use-profile --archive "$SUITE_ARCHIVE" --language-strategy sentence) ;;
+      esac
+      out=".logs/$RUN_SUITES-$suite.$model"
+      baseline="Evaluation/baselines/$suite.$model.json"
+      rm -rf "$out"
+      step "$RUN_SUITES: $suite ($model)"
+      if [ "$RUN_SUITES" = gate ]; then
+        if [ ! -f "$baseline" ]; then
+          echo "no baseline $baseline: run the baseline suites first"
+          status=1
+          continue
+        fi
+        "$BIN" eval "$manifest" --model "$model" "${args[@]}" --out "$out" --gate "$baseline" > "$out.log" 2>&1
+        code=$?
+        if [ -f "$out/gate.md" ]; then cat "$out/gate.md"; else tail -n 20 "$out.log"; fi
+        [ $code -eq 0 ] || status=1
+      else
+        if "$BIN" eval "$manifest" --model "$model" "${args[@]}" --out "$out" > "$out.log" 2>&1; then
+          cp "$out/report.json" "$baseline"
+          python3 -c "import json, sys; r = json.load(open(sys.argv[1])); o = r['summary']['overall']; print(f\"{sys.argv[1]}: {o['items']} items, WER {o['wer'] * 100:.1f}%, CER {o['cer'] * 100:.1f}%, language errors {o['languageMismatches']}, model {r['model']['fingerprint']}, data {r['dataset']['fingerprint']}\")" "$baseline" || status=1
+        else
+          status=1
+          tail -n 20 "$out.log"
+        fi
+      fi
+    done
   done
 fi
 

@@ -69,11 +69,44 @@ struct EvalCommand: AsyncParsableCommand {
     @Option(name: .customLong("out"), help: "Output folder (default: ./mneme-eval/<date>-<model>).")
     var outPath: String?
 
+    @Option(
+        name: .customLong("gate"),
+        help: "Compare the run with a baseline report.json (for example one in Evaluation/baselines/). Exit status: 0 passed, 1 refused, 2 error.",
+        completion: .file(extensions: ["json"])
+    )
+    var gatePath: String?
+
+    @Option(name: .customLong("max-wer"), help: "Gate: highest acceptable overall word error rate.")
+    var maximumWER: Double = EvalGate().maximumWER
+
+    @Option(name: .customLong("tolerance"), help: "Gate: largest acceptable increase of the overall word error rate over the baseline (0.01 is one point).")
+    var tolerance: Double = EvalGate().tolerance
+
     @OptionGroup var model: ModelOptions
     @OptionGroup var archive: ArchiveOptions
 
     func run() async throws {
-        var items = try Manifest.read(Paths.url(manifest))
+        guard gatePath != nil else {
+            try await evaluate()
+            return
+        }
+        // The gate's contract: 1 means the candidate was refused, anything that stopped the run is 2.
+        do {
+            try await evaluate()
+        } catch let exit as ExitCode {
+            throw exit
+        } catch {
+            Console.status("error: \(error.localizedDescription)")
+            throw ExitCode(2)
+        }
+    }
+
+    private func evaluate() async throws {
+        let started = Date()
+        // Read the baseline first, so a typo fails in a second rather than after the whole run.
+        let baseline = try gatePath.map { try EvalRunReport.read(from: Paths.url($0)) }
+        let manifestURL = Paths.url(manifest)
+        var items = try Manifest.read(manifestURL)
         if let limit {
             items = Array(items.prefix(max(0, limit)))
         }
@@ -122,6 +155,7 @@ struct EvalCommand: AsyncParsableCommand {
         let summary = EvalReporter.summarize(results)
         let settings: [(String, String)] = [
             ("Model", "\(model.profile.name) (\(model.profile.variant))"),
+            ("Model fingerprint", engine.modelFingerprint ?? "unknown"),
             ("Language mode", languageMode.rawValue),
             ("Language strategy", languageStrategy.rawValue),
             ("Language profile", profile.isEmpty ? "none" : profile.joined(separator: ", ")),
@@ -135,7 +169,37 @@ struct EvalCommand: AsyncParsableCommand {
         try summaryEncoder.encode(summary).write(to: outputFolder.appendingPathComponent("summary.json"), options: .atomic)
         try Data(report.utf8).write(to: outputFolder.appendingPathComponent("report.md"), options: .atomic)
         Console.out(report)
+
+        // Everything needed to compare this run with another one later: the baseline format.
+        let run = EvalRunReport(
+            started: started,
+            durationSeconds: Date().timeIntervalSince(started),
+            model: .init(profile: model.profile.name, variant: model.profile.variant, fingerprint: engine.modelFingerprint),
+            decoding: .init(
+                languageMode: languageMode.rawValue,
+                languageStrategy: languageStrategy.rawValue,
+                languageProfile: profile,
+                glossaryTerms: glossary.count
+            ),
+            dataset: .init(name: EvalDataset.name(forManifest: manifestURL), items: items.count, fingerprint: EvalDataset.fingerprint(items)),
+            summary: summary
+        )
+        try run.write(to: outputFolder.appendingPathComponent("report.json"))
+        for problem in engine.modelIntegrityProblems {
+            Console.status("warning: \(problem)")
+        }
         Console.out("Results written to \(outputFolder.path)")
+
+        if gatePath != nil {
+            let outcome = EvalGate(maximumWER: maximumWER, tolerance: tolerance).evaluate(run, against: baseline)
+            let markdown = outcome.markdown(title: "Gate (\(run.dataset.name), \(model.profile.name))")
+            try Data(markdown.utf8).write(to: outputFolder.appendingPathComponent("gate.md"), options: .atomic)
+            Console.out("")
+            Console.out(markdown)
+            if !outcome.passed {
+                throw ExitCode(1)
+            }
+        }
     }
 
     static func progressLine(_ result: EvalResult, position: Int, total: Int) -> String {
@@ -147,8 +211,13 @@ struct EvalCommand: AsyncParsableCommand {
         if let accent = result.item.accent {
             line += "  accent: \(accent)"
         }
-        if result.languageMismatch, let detected = result.detectedLanguage {
-            line += "  LANGUAGE: \(detected) instead of \(result.item.language ?? "?")"
+        if result.languageMismatch {
+            if let expected = result.item.languages {
+                let decoded = result.segmentLanguages ?? []
+                line += "  LANGUAGES: \(decoded.joined(separator: "+")) instead of \(expected.joined(separator: "+"))"
+            } else if let detected = result.detectedLanguage {
+                line += "  LANGUAGE: \(detected) instead of \(result.item.language ?? "?")"
+            }
         }
         return line
     }

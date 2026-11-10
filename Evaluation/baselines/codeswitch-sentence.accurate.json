@@ -1,0 +1,381 @@
+{
+  "dataset" : {
+    "fingerprint" : "91eae30c8bcd",
+    "items" : 14,
+    "name" : "cs"
+  },
+  "decoding" : {
+    "glossaryTerms" : 0,
+    "languageMode" : "detect",
+    "languageProfile" : [
+      "fr",
+      "en",
+      "de",
+      "ar"
+    ],
+    "languageStrategy" : "sentence"
+  },
+  "durationSeconds" : 72.57762694358826,
+  "mnemeVersion" : "0.1.0",
+  "model" : {
+    "fingerprint" : "6989e8ac69c5",
+    "profile" : "accurate",
+    "variant" : "large-v3"
+  },
+  "platform" : {
+    "architecture" : "arm64",
+    "machine" : "MacBookPro17,1",
+    "os" : "macOS 26.5.2"
+  },
+  "schemaVersion" : 1,
+  "started" : "2026-11-10T12:23:08.087Z",
+  "summary" : {
+    "byAccent" : [
+      {
+        "cer" : 0.09183673469387756,
+        "characters" : {
+          "deletions" : 0,
+          "insertions" : 1,
+          "referenceLength" : 98,
+          "substitutions" : 8
+        },
+        "failed" : 0,
+        "items" : 2,
+        "languageMismatches" : 0,
+        "name" : "fr with English words",
+        "wer" : 0.13043478260869565,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 1,
+          "referenceLength" : 23,
+          "substitutions" : 2
+        }
+      },
+      {
+        "cer" : 0.02564102564102564,
+        "characters" : {
+          "deletions" : 2,
+          "insertions" : 0,
+          "referenceLength" : 78,
+          "substitutions" : 0
+        },
+        "failed" : 0,
+        "items" : 1,
+        "languageMismatches" : 0,
+        "name" : "fr+ar",
+        "wer" : 0.0625,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 16,
+          "substitutions" : 1
+        }
+      },
+      {
+        "cer" : 0.014925373134328358,
+        "characters" : {
+          "deletions" : 1,
+          "insertions" : 0,
+          "referenceLength" : 201,
+          "substitutions" : 2
+        },
+        "failed" : 0,
+        "items" : 2,
+        "languageMismatches" : 0,
+        "name" : "en+fr",
+        "wer" : 0.023255813953488372,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 43,
+          "substitutions" : 1
+        }
+      },
+      {
+        "cer" : 0,
+        "characters" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 70,
+          "substitutions" : 0
+        },
+        "failed" : 0,
+        "items" : 1,
+        "languageMismatches" : 0,
+        "name" : "ar+fr",
+        "wer" : 0,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 16,
+          "substitutions" : 0
+        }
+      },
+      {
+        "cer" : 0,
+        "characters" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 52,
+          "substitutions" : 0
+        },
+        "failed" : 0,
+        "items" : 1,
+        "languageMismatches" : 0,
+        "name" : "de with English words",
+        "wer" : 0,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 12,
+          "substitutions" : 0
+        }
+      },
+      {
+        "cer" : 0,
+        "characters" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 175,
+          "substitutions" : 0
+        },
+        "failed" : 0,
+        "items" : 2,
+        "languageMismatches" : 0,
+        "name" : "de+en",
+        "wer" : 0,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 38,
+          "substitutions" : 0
+        }
+      },
+      {
+        "cer" : 0,
+        "characters" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 73,
+          "substitutions" : 0
+        },
+        "failed" : 0,
+        "items" : 1,
+        "languageMismatches" : 0,
+        "name" : "de+fr",
+        "wer" : 0,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 18,
+          "substitutions" : 0
+        }
+      },
+      {
+        "cer" : 0,
+        "characters" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 76,
+          "substitutions" : 0
+        },
+        "failed" : 0,
+        "items" : 1,
+        "languageMismatches" : 0,
+        "name" : "en+de",
+        "wer" : 0,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 17,
+          "substitutions" : 0
+        }
+      },
+      {
+        "cer" : 0,
+        "characters" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 71,
+          "substitutions" : 0
+        },
+        "failed" : 0,
+        "items" : 1,
+        "languageMismatches" : 0,
+        "name" : "fr+de",
+        "wer" : 0,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 16,
+          "substitutions" : 0
+        }
+      },
+      {
+        "cer" : 0,
+        "characters" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 210,
+          "substitutions" : 0
+        },
+        "failed" : 0,
+        "items" : 2,
+        "languageMismatches" : 0,
+        "name" : "fr+en",
+        "wer" : 0,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 44,
+          "substitutions" : 0
+        }
+      }
+    ],
+    "byLanguage" : [
+      {
+        "cer" : 0.024070021881838075,
+        "characters" : {
+          "deletions" : 2,
+          "insertions" : 1,
+          "referenceLength" : 457,
+          "substitutions" : 8
+        },
+        "failed" : 0,
+        "items" : 6,
+        "languageMismatches" : 0,
+        "name" : "fr",
+        "wer" : 0.04040404040404041,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 1,
+          "referenceLength" : 99,
+          "substitutions" : 3
+        }
+      },
+      {
+        "cer" : 0.010830324909747292,
+        "characters" : {
+          "deletions" : 1,
+          "insertions" : 0,
+          "referenceLength" : 277,
+          "substitutions" : 2
+        },
+        "failed" : 0,
+        "items" : 3,
+        "languageMismatches" : 0,
+        "name" : "en",
+        "wer" : 0.016666666666666666,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 60,
+          "substitutions" : 1
+        }
+      },
+      {
+        "cer" : 0,
+        "characters" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 70,
+          "substitutions" : 0
+        },
+        "failed" : 0,
+        "items" : 1,
+        "languageMismatches" : 0,
+        "name" : "ar",
+        "wer" : 0,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 16,
+          "substitutions" : 0
+        }
+      },
+      {
+        "cer" : 0,
+        "characters" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 300,
+          "substitutions" : 0
+        },
+        "failed" : 0,
+        "items" : 4,
+        "languageMismatches" : 0,
+        "name" : "de",
+        "wer" : 0,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 68,
+          "substitutions" : 0
+        }
+      }
+    ],
+    "byRegion" : [
+      {
+        "cer" : 0.06,
+        "characters" : {
+          "deletions" : 0,
+          "insertions" : 1,
+          "referenceLength" : 150,
+          "substitutions" : 8
+        },
+        "failed" : 0,
+        "items" : 3,
+        "languageMismatches" : 0,
+        "name" : "within a sentence",
+        "wer" : 0.08571428571428572,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 1,
+          "referenceLength" : 35,
+          "substitutions" : 2
+        }
+      },
+      {
+        "cer" : 0.005241090146750524,
+        "characters" : {
+          "deletions" : 3,
+          "insertions" : 0,
+          "referenceLength" : 954,
+          "substitutions" : 2
+        },
+        "failed" : 0,
+        "items" : 11,
+        "languageMismatches" : 0,
+        "name" : "between sentences",
+        "wer" : 0.009615384615384616,
+        "words" : {
+          "deletions" : 0,
+          "insertions" : 0,
+          "referenceLength" : 208,
+          "substitutions" : 2
+        }
+      }
+    ],
+    "overall" : {
+      "cer" : 0.012681159420289856,
+      "characters" : {
+        "deletions" : 3,
+        "insertions" : 1,
+        "referenceLength" : 1104,
+        "substitutions" : 10
+      },
+      "failed" : 0,
+      "items" : 14,
+      "languageMismatches" : 0,
+      "name" : "all",
+      "wer" : 0.0205761316872428,
+      "words" : {
+        "deletions" : 0,
+        "insertions" : 1,
+        "referenceLength" : 243,
+        "substitutions" : 4
+      }
+    },
+    "realTimeFactor" : 0.7029824330777152
+  }
+}

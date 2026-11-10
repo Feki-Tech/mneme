@@ -74,9 +74,9 @@ status=$?
 mv -f "$TMP_LOG" "$LOG"
 grep -E "error:|RESULT:" "$LOG" | tail -n 15
 
-# Real-model checks run only when requested ("model-check", "glossary-check" or "probe" in .logs/request),
-# never on ordinary builds.
-if [ $status -eq 0 ] && grep -qE "model-check|glossary-check|probe|turbo|codeswitch" .logs/request 2>/dev/null; then
+# Real-model checks run only when requested ("model-check", "glossary-check", "probe", "turbo", "codeswitch",
+# "baseline" or "gate" in .logs/request), never on ordinary builds.
+if [ $status -eq 0 ] && grep -qE "model-check|glossary-check|probe|turbo|codeswitch|baseline|gate" .logs/request 2>/dev/null; then
   echo "Running model checks (log: .logs/model-check.log)..."
   bash ./Scripts/model-check.sh "$(head -n 1 .logs/request)" > .logs/model-check.log 2>&1
   status=$?

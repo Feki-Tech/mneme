@@ -81,7 +81,7 @@ count=0
 for entry in "${ITEMS[@]}"; do
   IFS='|' read -r -a fields <<< "$entry"
   id="${fields[0]}"; label="${fields[1]}"; kind="${fields[2]}"
-  parts=(); texts=(); speakers=(); first_language=""; missing=0
+  parts=(); texts=(); speakers=(); languages=(); first_language=""; missing=0
   for spec in "${fields[@]:3}"; do
     language="${spec%%:*}"; sentence="${spec#*:}"
     case "$language" in
@@ -99,6 +99,10 @@ for entry in "${ITEMS[@]}"; do
     say -v "$voice" --file-format=WAVE --data-format=LEI16@16000 -o "$part" "$sentence"
     parts+=("$part"); texts+=("$sentence"); speakers+=("$voice")
     [ -z "$first_language" ] && first_language="$language"
+    # The expected sequence of languages, consecutive repeats merged.
+    if [ ${#languages[@]} -eq 0 ] || [ "${languages[${#languages[@]}-1]}" != "$language" ]; then
+      languages+=("$language")
+    fi
   done
   if [ $missing -eq 1 ]; then
     echo "  skipped $id: no voice for one of its languages"
@@ -107,8 +111,9 @@ for entry in "${ITEMS[@]}"; do
   join_parts "$OUT/$id.wav" "${parts[@]}"
   reference="${texts[*]}"
   speaker="$(IFS=+; echo "${speakers[*]}")"
-  printf '{"accent":"%s","audio":"%s","id":"%s","language":"%s","region":"%s","speaker":"%s","text":"%s"}\n' \
-    "$(json_escape "$label")" "$id.wav" "$id" "$first_language" "$(json_escape "$kind")" \
+  sequence="$(printf '"%s",' "${languages[@]}")"
+  printf '{"accent":"%s","audio":"%s","id":"%s","language":"%s","languages":[%s],"region":"%s","speaker":"%s","text":"%s"}\n' \
+    "$(json_escape "$label")" "$id.wav" "$id" "$first_language" "${sequence%,}" "$(json_escape "$kind")" \
     "$(json_escape "$speaker")" "$(json_escape "$reference")" >> "$MANIFEST"
   count=$((count + 1))
 done

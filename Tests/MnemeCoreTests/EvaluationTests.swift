@@ -128,4 +128,31 @@ final class EvaluationTests: XCTestCase {
         XCTAssertTrue(markdown.contains("| scottish | 2 | 20.0% |"), markdown)
         XCTAssertTrue(markdown.contains("## By accent (worst first)"))
     }
+
+    /// A recording that switches languages is judged on its sequence of segment languages, not on the single
+    /// language of the recording (the longest stretch).
+    func testCodeSwitchingItemsAreJudgedOnTheirLanguageSequence() throws {
+        let item = EvalItem(id: "en-fr-1", audio: "/tmp/en-fr-1.wav", text: "Hello. Bonjour.", language: "en", languages: ["en", "fr"])
+        let followed = EvalResult(item: item, detectedLanguage: "fr", segmentLanguages: ["en", "fr"])
+        XCTAssertFalse(followed.languageMismatch, "the longer French stretch decides the recording's language; the sequence is right")
+        XCTAssertTrue(EvalResult(item: item, detectedLanguage: "en", segmentLanguages: ["en"]).languageMismatch)
+        XCTAssertTrue(EvalResult(item: item, detectedLanguage: "fr", segmentLanguages: ["fr", "en"]).languageMismatch)
+        XCTAssertFalse(EvalResult(item: item, detectedLanguage: "fr", segmentLanguages: ["en", "en", "fr"]).languageMismatch)
+        XCTAssertFalse(EvalResult(item: item, segmentLanguages: ["en", "fr"], error: "boom").languageMismatch)
+
+        // Without a sequence, the reference language decides, as before.
+        let plain = EvalItem(audio: "/tmp/a.wav", text: "Hello.", language: "en")
+        XCTAssertTrue(EvalResult(item: plain, detectedLanguage: "fr", segmentLanguages: ["en"]).languageMismatch)
+
+        // Manifests resolve the codes of a sequence like the reference language, and reject unknown ones.
+        let manifestURL = directory.appendingPathComponent("cs.jsonl")
+        try Data("""
+            {"audio": "a.wav", "text": "Hello. Bonjour.", "language": "en", "languages": ["English", "fr-FR"]}
+            """.utf8).write(to: manifestURL)
+        XCTAssertEqual(try Manifest.read(manifestURL).first?.languages, ["en", "fr"])
+        try Data("""
+            {"audio": "a.wav", "text": "Hello.", "languages": ["en", "klingon"]}
+            """.utf8).write(to: manifestURL)
+        XCTAssertThrowsError(try Manifest.read(manifestURL))
+    }
 }

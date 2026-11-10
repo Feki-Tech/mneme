@@ -105,7 +105,9 @@ public enum EvalReporter {
             lines.append("")
         }
         lines.append("WER and CER are micro-averaged after normalisation (case, punctuation and annotations removed). ")
-        lines.append("For languages written without spaces, read CER rather than WER.")
+        lines.append("For languages written without spaces, read CER rather than WER. ")
+        lines.append("Language errors: items decoded in another language than the reference, or, for recordings that switch ")
+        lines.append("languages, whose segments did not follow the expected sequence of languages.")
         return lines.joined(separator: "\n") + "\n"
     }
 

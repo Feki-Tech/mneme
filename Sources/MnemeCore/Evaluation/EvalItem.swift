@@ -18,6 +18,9 @@ public struct EvalItem: Codable, Equatable, Sendable {
     /// Optional slice of a longer recording, in seconds.
     public var start: Double?
     public var end: Double?
+    /// For a recording that switches languages: the language of each stretch, in order, for example ["en", "fr"].
+    /// When set, the item counts as a language error unless its segments were decoded in exactly this sequence.
+    public var languages: [String]?
 
     public init(
         id: String? = nil,
@@ -28,7 +31,8 @@ public struct EvalItem: Codable, Equatable, Sendable {
         region: String? = nil,
         speaker: String? = nil,
         start: Double? = nil,
-        end: Double? = nil
+        end: Double? = nil,
+        languages: [String]? = nil
     ) {
         self.id = id
         self.audio = audio
@@ -39,6 +43,7 @@ public struct EvalItem: Codable, Equatable, Sendable {
         self.speaker = speaker
         self.start = start
         self.end = end
+        self.languages = languages
     }
 
     /// A readable identifier for logs and reports.
@@ -89,9 +94,24 @@ public struct EvalResult: Codable, Equatable, Sendable {
         self.error = error
     }
 
-    /// True when the transcription language differs from the reference language.
+    /// True when the item was decoded in another language than the reference, or, for an item that switches
+    /// languages (`EvalItem.languages`), when its segments did not follow the expected sequence of languages.
     public var languageMismatch: Bool {
-        guard error == nil, let reference = item.language, let detected = detectedLanguage else { return false }
+        guard error == nil else { return false }
+        if let expected = item.languages, !expected.isEmpty {
+            let decoded = segmentLanguages ?? detectedLanguage.map { [$0] } ?? []
+            return Self.sequence(decoded) != Self.sequence(expected)
+        }
+        guard let reference = item.language, let detected = detectedLanguage else { return false }
         return LanguagePolicy.normalize(reference) != LanguagePolicy.normalize(detected)
+    }
+
+    /// Normalised codes with consecutive repeats merged: ["en", "en", "fr"] is the sequence en, fr.
+    static func sequence(_ codes: [String]) -> [String] {
+        var result: [String] = []
+        for code in codes.map(LanguagePolicy.normalize) where result.last != code {
+            result.append(code)
+        }
+        return result
     }
 }

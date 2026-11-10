@@ -44,6 +44,16 @@ public enum Manifest {
                 }
                 item.language = code
             }
+            if let languages = item.languages {
+                var codes: [String] = []
+                for language in languages {
+                    guard let code = LanguagePolicy.resolve(language) else {
+                        throw ArchiveError.invalidManifest(line: lineNumber, reason: "unsupported language \"\(language)\" in \"languages\"")
+                    }
+                    codes.append(code)
+                }
+                item.languages = codes
+            }
             item.audio = resolve(item.audio, base: base).path
             items.append(item)
         }
