@@ -184,6 +184,13 @@ at 0.14 to 0.18 with the fast model (README, "Speed"). Four of the fast model's 
 single English word inside a French sentence ("deadline", heard as "10 de l'île de"); no item was decoded in the
 wrong language or sequence of languages.
 
+The first `model-eval` run on GitHub (macOS 26.7.2 virtual machine, 10 November 2026) downloaded the fast model
+afresh and got the same fingerprint, `13d1ce901ca6`: the published files had not changed since the Mac's download.
+The code-switching data was byte-identical too (same dataset fingerprint), and the gate compared it with the Mac's
+baseline: 2.5 % on both machines. The accent suites ran on the runner's own voices (0.6 % WER, absolute bars only).
+Same model files and same data gave the same result on another machine and operating system, which is what the
+fingerprints are for.
+
 ## 7. Lessons
 
 From Mneme's own history, each found only by running the real model:
@@ -212,7 +219,7 @@ Imported from ai-gym-coach and edgesense:
   evaluation set that never leaves the Mac.
 - The groups are small (one to four items per accent), which is why the group tolerance counts errors rather than
   percentages.
-- On GitHub's runners the voices differ, so the dataset fingerprints differ and the CI gate applies its absolute bars
-  only. The runners are virtual machines without the Neural Engine: their speed numbers are not comparable with a
-  Mac's.
+- On GitHub's runners the accent suites get other voices, so their dataset fingerprints differ and the CI gate
+  applies its absolute bars only. The runners are virtual machines without the Neural Engine: their speed numbers are
+  not comparable with a Mac's: the three suites with the fast model take about 18 minutes there, about 3 on the M1.
 - The first download of a model is trusted as published (SECURITY.md, S3).

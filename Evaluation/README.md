@@ -21,8 +21,9 @@ the machine.
    same suites with `mneme eval --gate` against these files. Exit 0: passed; 1: refused (a regression or a missed
    bar, listed in `gate.md`); 2: the run itself failed.
 3. **Comparisons hold only on the same data.** The audio comes from the voices installed on the Mac that made the
-   baseline. On other data (another Mac, a CI runner) the dataset fingerprint differs and the gate applies its
-   absolute bars only: no failed items, overall WER at most 10 %.
+   baseline. On other data the dataset fingerprint differs and the gate applies its absolute bars only: no failed
+   items, overall WER at most 10 %. On GitHub's runners this is the case for the accent suites, whose voices differ;
+   the code-switching suite's named voices produced byte-identical audio there, so it is compared in CI too.
 4. **Promotion is a human decision.** To make another model the default, run the suites with it (`mneme eval … --model
    <candidate> --gate baselines/<suite>.fast.json`): the gate compares the challenger with the champion and notes that
    the model differs. If it passes, change `ModelProfile.defaultProfile`, regenerate the baselines and commit both.

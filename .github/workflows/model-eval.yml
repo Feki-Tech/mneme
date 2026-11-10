@@ -5,10 +5,11 @@ name: model-eval
 # (Scripts/model-check.sh gate), the reports in the job summary, and `mneme eval --gate` against the committed
 # baselines in Evaluation/baselines/. Nothing is promoted automatically; the run is evidence for a human decision.
 #
-# The runner's voices are not those of the Mac that produced the baselines, so the dataset fingerprints differ and
-# the gate applies its absolute bars here (no failed items, overall WER at most 10 %). The relative comparison runs
-# where the baselines' data lives: `bash Scripts/model-check.sh gate` on that Mac. Runs weekly (upstream models
-# and toolchains drift), on demand, and on pull requests that touch the speech pipeline or its dependencies.
+# The accent suites use whichever voices a machine has, so on the runner their data differs from the baselines' and
+# the gate applies its absolute bars (no failed items, overall WER at most 10 %). The code-switching suite uses named
+# voices whose audio has so far been byte-identical on the runner, so it is compared with its baseline here as well;
+# the full relative comparison runs on the Mac that made the baselines (`bash Scripts/model-check.sh gate`). Runs
+# weekly (upstream models and toolchains drift), on demand, and on pull requests that touch the speech pipeline.
 
 on:
   schedule:
