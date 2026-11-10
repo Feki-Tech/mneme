@@ -112,6 +112,11 @@ public final class WhisperEngine {
     /// The decoder WhisperKit loaded, and the copy restricted to the current language profile.
     private var baseDecoder: TextDecoder?
     private var restrictedDecoder: (key: String, decoder: TextDecoder, primed: Bool)?
+    /// Fingerprint of the loaded model files (see `ModelManifest`), stamped on every transcript; "modified" when
+    /// the files no longer match the manifest written when the model was first used.
+    public private(set) var modelFingerprint: String?
+    /// Differences between the model folder and its manifest, found when the model was loaded.
+    public private(set) var modelIntegrityProblems: [String] = []
 
     public init(profile: ModelProfile = .defaultProfile, modelsDirectory: URL = ModelLocator.defaultModelsDirectory) {
         self.profile = profile
@@ -165,6 +170,21 @@ public final class WhisperEngine {
         if let folder = ModelLocator.localModelFolder(variant: profile.variant, base: modelsDirectory) {
             ModelLocator.markReady(folder)
             modelFolderName = folder.lastPathComponent
+            identifyModel(in: folder)
+        }
+    }
+
+    /// Records which model files are loaded. The first time, this hashes the model (about a second per gigabyte);
+    /// afterwards only names and sizes are compared with the manifest.
+    private func identifyModel(in folder: URL) {
+        do {
+            let manifest = try ModelLocator.ensureManifest(folder: folder, variant: profile.variant)
+            let problems = manifest.quickCheck(folder: folder)
+            modelIntegrityProblems = problems
+            modelFingerprint = problems.isEmpty ? manifest.fingerprint : "modified"
+        } catch {
+            modelIntegrityProblems = ["the model manifest could not be read or written: \(error.localizedDescription)"]
+            modelFingerprint = nil
         }
     }
 
@@ -412,7 +432,11 @@ public final class WhisperEngine {
             "language_profile": allowed.joined(separator: ","),
             "glossary_terms": String(request.glossary.count),
             "prompt_tokens": String(promptTokenCount),
+            "mneme_version": MnemeVersion.current,
         ]
+        if let modelFingerprint {
+            settings["model_fingerprint"] = modelFingerprint
+        }
         if perWindowLanguage {
             let draft = Transcript(language: language, segments: segments, provenance: Provenance(engine: "draft", modelID: "draft"))
             settings["speech_by_language"] = draft.speechByLanguage

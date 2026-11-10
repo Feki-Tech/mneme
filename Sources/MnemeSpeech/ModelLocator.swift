@@ -1,4 +1,5 @@
 import Foundation
+import MnemeCore
 
 /// Where WhisperKit models live on this Mac, and whether a model is complete and prepared.
 ///
@@ -57,6 +58,27 @@ public enum ModelLocator {
         if !FileManager.default.fileExists(atPath: marker.path) {
             try? Data("loaded\n".utf8).write(to: marker)
         }
+    }
+
+    /// Where model files come from, as recorded in their manifests.
+    public static let source = "huggingface.co/\(repository)"
+
+    /// The folder's manifest; written now, by hashing every model file, when the folder has none yet.
+    @discardableResult
+    public static func ensureManifest(folder: URL, variant: String) throws -> ModelManifest {
+        if let existing = try ModelManifest.read(from: folder) {
+            return existing
+        }
+        let manifest = try ModelManifest.build(folder: folder, variant: variant, source: source)
+        try manifest.write(to: folder)
+        return manifest
+    }
+
+    /// The variant name of a model folder: "openai_whisper-large-v3" holds "large-v3".
+    public static func variant(forFolder folder: URL) -> String {
+        let name = folder.lastPathComponent
+        let prefix = "openai_whisper-"
+        return name.hasPrefix(prefix) ? String(name.dropFirst(prefix.count)) : name
     }
 
     /// Complete model folders in the models directory.

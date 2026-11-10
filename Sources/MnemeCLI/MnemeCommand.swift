@@ -12,7 +12,7 @@ struct MnemeCommand: AsyncParsableCommand {
             Audio, transcripts and models stay on this Mac. The network is used only to download a \
             speech model, and only when you ask for it (`mneme models download` or --allow-download).
             """,
-        version: "0.1.0",
+        version: MnemeVersion.current,
         subcommands: [
             IngestCommand.self,
             TranscribeCommand.self,
