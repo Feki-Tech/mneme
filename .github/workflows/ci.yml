@@ -119,8 +119,8 @@ jobs:
       - name: Build for the simulator, install, open every screen in demo mode
         run: bash Scripts/ios-check.sh
 
-      - name: Show the full log
-        if: failure()
+      - name: Show the log
+        if: always()
         run: tail -n 300 .logs/ios.log || true
 
       - name: Upload the log and screenshots
