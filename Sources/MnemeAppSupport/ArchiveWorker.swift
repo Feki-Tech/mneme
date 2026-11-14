@@ -127,8 +127,10 @@ actor ArchiveWorker {
     func importRecording(url: URL, title: String?) throws -> EntryRecord {
         let archive = try store()
         guard url.pathExtension.lowercased() == "caf" else {
+            // A recording exported by Mneme on another device carries its date and title in its name.
+            let named = RecordingFileName.parse(url.lastPathComponent)
             let audio = try AudioPreparer.prepare(url)
-            return try archive.ingestAudio(audio, title: title).entry
+            return try archive.ingestAudio(audio, title: title ?? named.title, recordedAt: named.date).entry
         }
         let encoded = url.deletingPathExtension().appendingPathExtension("m4a")
         if let existing = try archive.asset(originalFilename: encoded.lastPathComponent),
@@ -141,6 +143,46 @@ actor ArchiveWorker {
         defer { try? FileManager.default.removeItem(at: encoded) }
         let audio = try AudioPreparer.prepare(encoded)
         return try archive.ingestAudio(audio, title: title, recordedAt: startedAt).entry
+    }
+
+    /// Copies of an entry for sharing: the original recording, named with its date and title, and a Markdown copy
+    /// of its transcript or note. Written to a fresh folder in `directory`.
+    func exportFiles(entryID: String, to directory: URL) throws -> [URL] {
+        let details = try store().entryDetails(id: entryID)
+        let folder = directory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var files: [URL] = []
+        if let audioURL = details.audioURL {
+            let fileExtension = audioURL.pathExtension.isEmpty ? "m4a" : audioURL.pathExtension
+            let target = folder.appendingPathComponent(RecordingFileName.make(date: details.entry.recordedAt, title: details.entry.title, fileExtension: fileExtension))
+            try FileManager.default.copyItem(at: audioURL, to: target)
+            files.append(target)
+        }
+        let text = folder.appendingPathComponent(RecordingFileName.make(date: details.entry.recordedAt, title: details.entry.title, fileExtension: "md"))
+        try Data(MarkdownExport.document(for: details).utf8).write(to: text, options: .atomic)
+        files.append(text)
+        return files
+    }
+
+    /// Every entry's files (see `exportFiles`) in one folder, ready to be zipped or copied.
+    func exportAll(to directory: URL) throws -> URL {
+        let folder = directory.appendingPathComponent("Mneme export \(RecordingFileName.make(date: Date(), title: nil, fileExtension: "x").dropLast(2))", isDirectory: true)
+        try? FileManager.default.removeItem(at: folder)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let scratch = directory.appendingPathComponent("parts-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        for summary in try store().recentEntries(limit: 100_000) {
+            for file in try exportFiles(entryID: summary.entry.id, to: scratch) {
+                var target = folder.appendingPathComponent(file.lastPathComponent)
+                var counter = 2
+                while FileManager.default.fileExists(atPath: target.path) {
+                    target = folder.appendingPathComponent("\(file.deletingPathExtension().lastPathComponent) (\(counter)).\(file.pathExtension)")
+                    counter += 1
+                }
+                try FileManager.default.moveItem(at: file, to: target)
+            }
+        }
+        return folder
     }
 
     /// False once the entry has been deleted.

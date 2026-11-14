@@ -1,3 +1,4 @@
+import MnemeAppSupport
 import AppKit
 import SwiftUI
 
@@ -38,6 +39,11 @@ struct Mneme: App {
                     model.route = .newNote
                 }
                 .keyboardShortcut("n")
+                Divider()
+                Button("Import Recordings…") {
+                    model.isImportingFiles = true
+                }
+                .keyboardShortcut("i", modifiers: [.command, .shift])
             }
             CommandMenu("Archive") {
                 Button("Review Flagged Passages") {

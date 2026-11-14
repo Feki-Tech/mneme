@@ -1,4 +1,6 @@
+import MnemeAppSupport
 import MnemeCore
+import UniformTypeIdentifiers
 import SwiftUI
 
 struct ContentView: View {
@@ -39,6 +41,22 @@ struct ContentView: View {
             }
         } message: { _ in
             Text("Its recording, transcripts, notes and history are removed from this Mac. This cannot be undone.")
+        }
+        // Recordings shared from the iPhone app (or any audio file) are archived and transcribed here.
+        .fileImporter(isPresented: $model.isImportingFiles, allowedContentTypes: [.audio], allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result {
+                Task {
+                    await model.importAudioFiles(urls)
+                }
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            let audio = urls.filter { ["m4a", "caf", "wav", "aiff", "aif", "mp3", "mp4", "aac", "flac"].contains($0.pathExtension.lowercased()) }
+            guard !audio.isEmpty else { return false }
+            Task {
+                await model.importAudioFiles(audio)
+            }
+            return true
         }
     }
 

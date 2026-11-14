@@ -5,8 +5,8 @@ import SwiftUI
 
 /// The app's state. Archive work runs in `ArchiveWorker`; transcriptions run one at a time.
 @MainActor
-final class AppModel: ObservableObject {
-    enum Route: Hashable {
+public final class AppModel: ObservableObject {
+    public enum Route: Hashable {
         case home
         case entry(String)
         case recorder
@@ -14,58 +14,60 @@ final class AppModel: ObservableObject {
         case review
     }
 
-    enum Filter: String, CaseIterable, Identifiable {
+    public enum Filter: String, CaseIterable, Identifiable {
         case all = "All"
         case voice = "Voice"
         case notes = "Notes"
         case attention = "To review"
 
-        var id: String { rawValue }
+        public var id: String { rawValue }
     }
 
-    struct Notice: Identifiable {
-        let id = UUID()
-        let title: String
-        let message: String
+    public struct Notice: Identifiable {
+        public let id = UUID()
+        public let title: String
+        public let message: String
     }
 
-    @Published var route: Route = .home
-    @Published var filter: Filter = .all
-    @Published var searchText = "" {
+    @Published public var route: Route = .home
+    @Published public var filter: Filter = .all
+    @Published public var searchText = "" {
         didSet { scheduleSearch() }
     }
-    @Published var notice: Notice?
+    @Published public var notice: Notice?
     /// Entry waiting for the user to confirm its deletion.
-    @Published var pendingDeletion: String?
+    @Published public var pendingDeletion: String?
+    /// The file picker for importing recordings is open.
+    @Published public var isImportingFiles = false
     /// Glossary suggestions from the last correction.
-    @Published var suggestions: [String] = []
+    @Published public var suggestions: [String] = []
 
-    @Published private(set) var entries: [EntrySummary] = []
-    @Published private(set) var searchHits: [SearchHit] = []
-    @Published private(set) var details: EntryDetails?
-    @Published private(set) var flagged: [FlaggedSegment] = []
-    @Published private(set) var transcribingEntryID: String?
-    @Published private(set) var queuedEntryIDs: [String] = []
-    @Published private(set) var modelReady = false
+    @Published public private(set) var entries: [EntrySummary] = []
+    @Published public private(set) var searchHits: [SearchHit] = []
+    @Published public private(set) var details: EntryDetails?
+    @Published public private(set) var flagged: [FlaggedSegment] = []
+    @Published public private(set) var transcribingEntryID: String?
+    @Published public private(set) var queuedEntryIDs: [String] = []
+    @Published public private(set) var modelReady = false
     /// The model is loaded in this session; until then the first transcription also loads it.
-    @Published private(set) var modelLoaded = false
+    @Published public private(set) var modelLoaded = false
     /// The model is being loaded ahead of time (at launch or when a recording starts).
-    @Published private(set) var isPreparingModel = false
+    @Published public private(set) var isPreparingModel = false
     /// Share of the current transcription done, and its text so far.
-    @Published private(set) var transcriptionProgress: Double?
-    @Published private(set) var partialTranscript = ""
+    @Published public private(set) var transcriptionProgress: Double?
+    @Published public private(set) var partialTranscript = ""
     /// Each sentence gets its own language (for speakers who switch languages within a recording).
-    @Published private(set) var mixedLanguages = true
-    @Published private(set) var modelProfile: ModelProfile
-    @Published private(set) var isDownloading = false
-    @Published private(set) var downloadProgress: Double?
-    @Published private(set) var languageProfile: [String] = []
-    @Published private(set) var glossary: [String] = []
+    @Published public private(set) var mixedLanguages = true
+    @Published public private(set) var modelProfile: ModelProfile
+    @Published public private(set) var isDownloading = false
+    @Published public private(set) var downloadProgress: Double?
+    @Published public private(set) var languageProfile: [String] = []
+    @Published public private(set) var glossary: [String] = []
 
-    let recorder = RecorderModel()
-    let player = PlayerModel()
-    let archiveRoot: URL
-    let modelsDirectory: URL
+    public let recorder = RecorderModel()
+    public let player = PlayerModel()
+    public let archiveRoot: URL
+    public let modelsDirectory: URL
 
     private let worker: ArchiveWorker
     private var searchTask: Task<Void, Never>?
@@ -75,7 +77,7 @@ final class AppModel: ObservableObject {
 
     private static let profileKey = "modelProfile"
 
-    init(archiveRoot: URL = ArchiveStore.defaultRoot, modelsDirectory: URL = ModelLocator.defaultModelsDirectory) {
+    public init(archiveRoot: URL = ArchiveStore.defaultRoot, modelsDirectory: URL = ModelLocator.defaultModelsDirectory) {
         let profile = ModelProfile.resolve(UserDefaults.standard.string(forKey: AppModel.profileKey) ?? ModelProfile.defaultProfile.name)
         self.archiveRoot = archiveRoot
         self.modelsDirectory = modelsDirectory
@@ -84,11 +86,11 @@ final class AppModel: ObservableObject {
     }
 
     /// Recordings in progress, and any that could not be archived, live here (private to the user).
-    var recordingsFolder: URL {
+    public var recordingsFolder: URL {
         archiveRoot.deletingLastPathComponent().appendingPathComponent("Recordings", isDirectory: true)
     }
 
-    var visibleEntries: [EntrySummary] {
+    public var visibleEntries: [EntrySummary] {
         switch filter {
         case .all:
             return entries
@@ -102,16 +104,21 @@ final class AppModel: ObservableObject {
     }
 
     /// Search results, one row per entry (the best match).
-    var visibleSearchHits: [SearchHit] {
+    public var visibleSearchHits: [SearchHit] {
         var seen = Set<String>()
         return searchHits.filter { seen.insert($0.entryID).inserted }
     }
 
     // MARK: - Lifecycle
 
-    func start() async {
+    public func start() async {
         guard !started else { return }
         started = true
+        #if os(iOS)
+        // Models can be downloaded again: they stay out of the iPhone's backups.
+        Self.setExcludedFromBackup(modelsDirectory, true)
+        Self.setExcludedFromBackup(archiveRoot.deletingLastPathComponent(), !includeArchiveInBackups)
+        #endif
         await refreshSettings()
         await reload()
         await recoverRecordings()
@@ -122,7 +129,7 @@ final class AppModel: ObservableObject {
 
     /// Loads the model in the background so the next transcription starts at once. Loading the large model
     /// takes several seconds, and minutes the first time after an installation while Core ML prepares it.
-    func prepareModel() {
+    public func prepareModel() {
         guard modelReady, !modelLoaded, !isPreparingModel else { return }
         isPreparingModel = true
         Task { [weak self] in
@@ -137,7 +144,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func reload() async {
+    public func reload() async {
         do {
             entries = try await worker.entries()
             flagged = try await worker.flaggedSegments()
@@ -149,7 +156,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func loadDetails(_ id: String) async {
+    public func loadDetails(_ id: String) async {
         do {
             details = try await worker.details(id: id)
         } catch {
@@ -160,15 +167,17 @@ final class AppModel: ObservableObject {
 
     // MARK: - Recording
 
-    func startRecording() async {
+    public func startRecording() async {
         if recorder.permission != .granted {
             await recorder.requestPermission()
         }
         guard recorder.permission == .granted else {
-            notice = Notice(
-                title: "Microphone access is off",
-                message: "Allow Mneme in System Settings > Privacy & Security > Microphone, then try again."
-            )
+            #if os(iOS)
+            let place = "Settings > Privacy & Security > Microphone"
+            #else
+            let place = "System Settings > Privacy & Security > Microphone"
+            #endif
+            notice = Notice(title: "Microphone access is off", message: "Allow Mneme in \(place), then try again.")
             return
         }
         do {
@@ -180,7 +189,7 @@ final class AppModel: ObservableObject {
     }
 
     /// Stops, archives the original at once, then queues the transcription.
-    func finishRecording(title: String, language: String?) async {
+    public func finishRecording(title: String, language: String?) async {
         let length = recorder.elapsed
         guard let url = recorder.stop() else { return }
         if length < 0.5 {
@@ -250,9 +259,89 @@ final class AppModel: ObservableObject {
         )
     }
 
+    // MARK: - Import and export
+
+    /// Archives audio files (for example recordings exported by Mneme on an iPhone) and queues their transcription.
+    /// Files written by Mneme keep their recording date and title, which are part of their names.
+    public func importAudioFiles(_ urls: [URL]) async {
+        var imported: [String] = []
+        var failures: [String] = []
+        for url in urls {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer {
+                if scoped { url.stopAccessingSecurityScopedResource() }
+            }
+            do {
+                imported.append(try await worker.importRecording(url: url, title: nil).id)
+            } catch ArchiveError.duplicateRecording(let entryID) {
+                imported.append(entryID)
+            } catch {
+                failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
+            }
+        }
+        await reload()
+        for entryID in imported {
+            queueTranscription(entryID)
+        }
+        if let first = imported.first, imported.count == 1 {
+            route = .entry(first)
+        }
+        if !failures.isEmpty {
+            notice = Notice(title: "Some files could not be imported", message: failures.joined(separator: "\n"))
+        }
+    }
+
+    /// The entry's original recording and a Markdown copy, in a temporary folder, ready to share.
+    public func exportFiles(entryID: String) async -> [URL] {
+        do {
+            return try await worker.exportFiles(entryID: entryID, to: exportDirectory)
+        } catch {
+            show(error)
+            return []
+        }
+    }
+
+    /// Every entry's recording and Markdown copy in one folder.
+    public func exportAll() async -> URL? {
+        do {
+            return try await worker.exportAll(to: exportDirectory)
+        } catch {
+            show(error)
+            return nil
+        }
+    }
+
+    private var exportDirectory: URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("Mneme exports", isDirectory: true)
+    }
+
+    #if os(iOS)
+    private static let backupKey = "includeArchiveInBackups"
+
+    /// Whether the archive (not the models) is part of the iPhone's iCloud or computer backups. On by default, so a
+    /// lost phone does not mean lost recordings.
+    public var includeArchiveInBackups: Bool {
+        get { UserDefaults.standard.object(forKey: Self.backupKey) as? Bool ?? true }
+        set {
+            objectWillChange.send()
+            UserDefaults.standard.set(newValue, forKey: Self.backupKey)
+            Self.setExcludedFromBackup(archiveRoot.deletingLastPathComponent(), !newValue)
+            Self.setExcludedFromBackup(modelsDirectory, true)
+        }
+    }
+
+    private static func setExcludedFromBackup(_ folder: URL, _ excluded: Bool) {
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = excluded
+        var target = folder
+        try? target.setResourceValues(values)
+    }
+    #endif
+
     // MARK: - Transcription queue
 
-    func queueTranscription(_ entryID: String, language: String? = nil) {
+    public func queueTranscription(_ entryID: String, language: String? = nil) {
         if let language {
             languageOverrides[entryID] = language
         }
@@ -312,7 +401,7 @@ final class AppModel: ObservableObject {
 
     // MARK: - Review and corrections
 
-    func correct(entryID: String, segment: Int, text: String) async -> Bool {
+    public func correct(entryID: String, segment: Int, text: String) async -> Bool {
         do {
             let result = try await worker.correct(entryID: entryID, segment: segment, text: text)
             suggestions = result.glossarySuggestions
@@ -324,7 +413,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func confirm(entryID: String, segment: Int) async {
+    public func confirm(entryID: String, segment: Int) async {
         do {
             _ = try await worker.confirm(entryID: entryID, segment: segment)
             await reload()
@@ -333,7 +422,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func acceptSuggestions() async {
+    public func acceptSuggestions() async {
         let terms = suggestions
         suggestions = []
         await addGlossaryTerms(terms)
@@ -343,7 +432,7 @@ final class AppModel: ObservableObject {
 
     /// Saves a note; editing a saved note adds a version. `navigate` is false for the save made when the user
     /// leaves the editor, which must not change what they are looking at.
-    func saveNote(entryID: String?, title: String, body: String, navigate: Bool = true) async -> Bool {
+    public func saveNote(entryID: String?, title: String, body: String, navigate: Bool = true) async -> Bool {
         do {
             let id: String
             if let entryID {
@@ -367,7 +456,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func rename(entryID: String, title: String) async {
+    public func rename(entryID: String, title: String) async {
         do {
             try await worker.rename(entryID: entryID, title: title)
             await reload()
@@ -379,7 +468,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func delete(entryID: String) async {
+    public func delete(entryID: String) async {
         guard transcribingEntryID != entryID else {
             notice = Notice(
                 title: "This recording is being transcribed",
@@ -425,7 +514,7 @@ final class AppModel: ObservableObject {
 
     // MARK: - Settings
 
-    func refreshSettings() async {
+    public func refreshSettings() async {
         do {
             languageProfile = try await worker.languageProfile()
             glossary = try await worker.glossary()
@@ -435,7 +524,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func setLanguage(_ code: String, enabled: Bool) async {
+    public func setLanguage(_ code: String, enabled: Bool) async {
         var codes = languageProfile.filter { $0 != code }
         if enabled {
             codes.append(code)
@@ -443,7 +532,7 @@ final class AppModel: ObservableObject {
         await setLanguages(codes)
     }
 
-    func setLanguages(_ codes: [String]) async {
+    public func setLanguages(_ codes: [String]) async {
         do {
             languageProfile = try await worker.setLanguageProfile(codes)
         } catch {
@@ -451,7 +540,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func setMixedLanguages(_ enabled: Bool) async {
+    public func setMixedLanguages(_ enabled: Bool) async {
         do {
             try await worker.setMixedLanguages(enabled)
             mixedLanguages = try await worker.mixedLanguages()
@@ -460,7 +549,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func addGlossaryTerms(_ terms: [String]) async {
+    public func addGlossaryTerms(_ terms: [String]) async {
         guard !terms.isEmpty else { return }
         do {
             try await worker.addGlossaryTerms(terms)
@@ -470,7 +559,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func removeGlossaryTerm(_ term: String) async {
+    public func removeGlossaryTerm(_ term: String) async {
         do {
             try await worker.removeGlossaryTerm(term)
             glossary = try await worker.glossary()
@@ -479,11 +568,11 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func refreshModelStatus() async {
+    public func refreshModelStatus() async {
         modelReady = await worker.isModelReady()
     }
 
-    func selectModel(named name: String) async {
+    public func selectModel(named name: String) async {
         let profile = ModelProfile.resolve(name)
         UserDefaults.standard.set(profile.name, forKey: AppModel.profileKey)
         modelProfile = profile
@@ -495,7 +584,7 @@ final class AppModel: ObservableObject {
     }
 
     /// Started only by the user's click in Settings: the one place where Mneme uses the network.
-    func downloadModel() async {
+    public func downloadModel() async {
         guard !isDownloading else { return }
         isDownloading = true
         downloadProgress = 0
@@ -515,7 +604,7 @@ final class AppModel: ObservableObject {
         downloadProgress = nil
     }
 
-    func verifyArchive() async {
+    public func verifyArchive() async {
         do {
             let report = try await worker.verify()
             var lines = [
@@ -540,7 +629,7 @@ final class AppModel: ObservableObject {
 
     // MARK: - Errors
 
-    func show(_ error: Error) {
+    public func show(_ error: Error) {
         notice = Notice(title: "Something went wrong", message: error.localizedDescription)
     }
 }

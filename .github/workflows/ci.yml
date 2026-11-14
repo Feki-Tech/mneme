@@ -2,8 +2,9 @@ name: CI
 
 # Every push and pull request: dependencies come from Package.resolved only (the lockfile discipline of
 # ai-gym-coach's uv.lock), the package builds, unit and property tests pass, the command-line tool and the app
-# pass their smoke tests, and every screen of the app is rendered for review. Model evaluations need the real
-# models and run in model-eval.yml. On main, a test-gated Mneme.app is published as a build artifact.
+# pass their smoke tests, every screen of the app is rendered for review, and the iPhone app is built and its
+# screens captured in the iOS Simulator. Model evaluations need the real models and run in model-eval.yml.
+# On main, a test-gated Mneme.app is published as a build artifact.
 
 on:
   push:
@@ -92,6 +93,44 @@ jobs:
           path: |
             .logs/latest.log
             .logs/screens
+          if-no-files-found: ignore
+          retention-days: 14
+
+  ios:
+    name: Build the iPhone app and capture its screens (iOS Simulator)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Toolchain and simulators
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes available
+
+      - name: Cache Swift packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/ios/SourcePackages
+          key: ios-spm-${{ runner.arch }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: ios-spm-${{ runner.arch }}-
+
+      - name: Build for the simulator, install, open every screen in demo mode
+        run: bash Scripts/ios-check.sh
+
+      - name: Show the full log
+        if: failure()
+        run: tail -n 300 .logs/ios.log || true
+
+      - name: Upload the log and screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-${{ github.sha }}
+          path: |
+            .logs/ios.log
+            .logs/ios
           if-no-files-found: ignore
           retention-days: 14
 

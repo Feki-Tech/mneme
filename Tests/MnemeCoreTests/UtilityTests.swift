@@ -81,3 +81,27 @@ final class UtilityTests: XCTestCase {
         XCTAssertEqual(report.summary, "2 empty segment(s) dropped, segments reordered by time")
     }
 }
+
+/// Recordings keep their date and title when they move between devices.
+final class RecordingFileNameTests: XCTestCase {
+    private let berlin = TimeZone(identifier: "Europe/Berlin")!
+
+    func testExportedNamesRoundTrip() throws {
+        let date = Date(timeIntervalSince1970: 1_794_629_292) // 2026-11-14 05:08:12 in Berlin
+        let name = RecordingFileName.make(date: date, title: "Morning walk: ideas/plans", fileExtension: "m4a", timeZone: berlin)
+        XCTAssertEqual(name, "20261114-050812 Morning walk- ideas-plans.m4a")
+        let parsed = RecordingFileName.parse(name, timeZone: berlin)
+        XCTAssertEqual(parsed.date, date)
+        XCTAssertEqual(parsed.title, "Morning walk- ideas-plans")
+        XCTAssertEqual(RecordingFileName.make(date: date, title: "  ", fileExtension: "md", timeZone: berlin), "20261114-050812.md")
+    }
+
+    func testWorkingFilesAndForeignNames() {
+        let working = RecordingFileName.parse("recording-20261108-101530-a1b2c3d4.caf", timeZone: berlin)
+        XCTAssertNotNil(working.date)
+        XCTAssertNil(working.title)
+        let foreign = RecordingFileName.parse("New Recording 3.m4a", timeZone: berlin)
+        XCTAssertNil(foreign.date)
+        XCTAssertNil(foreign.title)
+    }
+}

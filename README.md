@@ -3,14 +3,14 @@
 [![CI](https://github.com/Feki-Tech/mneme/actions/workflows/ci.yml/badge.svg)](https://github.com/Feki-Tech/mneme/actions/workflows/ci.yml)
 [![model-eval](https://github.com/Feki-Tech/mneme/actions/workflows/model-eval.yml/badge.svg)](https://github.com/Feki-Tech/mneme/actions/workflows/model-eval.yml)
 
-Mneme is a Mac app for recording thoughts and writing notes, with the engine behind it also available as a command-line tool:
+Mneme is a Mac and iPhone app for recording thoughts and writing notes, with the engine behind it also available as a command-line tool:
 
-- **The app.** Record, play back, review the passages the recogniser was unsure about, write and edit notes, search everything.
+- **The apps.** Record, play back, review the passages the recogniser was unsure about, write and edit notes, search everything. The iPhone app transcribes on the phone and hands recordings to the Mac by AirDrop or Files.
 - **Speech recognition on your Mac.** Whisper large-v3 turbo (or the full large-v3) runs through WhisperKit (Core ML on the Apple Neural Engine). It handles many accents, 100 languages, and speakers who switch languages from one sentence to the next.
 - **A structured archive.** SQLite stores entries, recordings, versioned transcripts, segments and word timings, with full-text search. The original recordings are kept, verified by checksum.
 - **Accent tests.** A harness reports word and character error rates per accent, region and language.
 
-Nothing leaves your Mac. The network is used only to download a speech model, and only when you ask for it.
+Nothing leaves your device unless you share it. The network is used only to download a speech model, and only when you ask for it.
 
 ## Requirements
 
@@ -54,6 +54,28 @@ The first recording asks for microphone access. The app uses the same archive an
 - **Deletion.** Removes the recording, all transcript and note versions and the search entries. Deleted database content is overwritten, not left in free pages.
 
 Without a model, recordings are still archived and wait for transcription.
+
+## The iPhone app
+
+The iPhone (and iPad) app lives in `iOS/Mneme.xcodeproj` and uses the same archive code as the Mac app (`MnemeAppSupport`, `MnemeCore`, `MnemeSpeech`). It needs iOS 17 or later.
+
+- **Recording.** A large record button on the archive screen. Recording continues with the screen locked or another app in front, and resumes after a phone call. As on the Mac, the recording is written to a working file first, archived and verified when you stop, and transcribed right after.
+- **Transcription on the phone.** Two models are offered: *fast* (large-v3 turbo, about 626 MB; recommended for iPhone 15 Pro and later) and *compact* (Whisper small, about 216 MB; for iPhones with less memory). The download starts only when you tap it. The first load prepares the model for the phone's Neural Engine and can take a few minutes.
+- **Archive, search, review, notes, settings.** The same features as the Mac app: playback by passage, corrections and confirmations (swipe a passage), the review queue, versioned notes, languages, mixed-language mode and the glossary.
+- **Backups.** The archive is included in the iPhone's iCloud or computer backup by default (Settings > Archive). Speech models are always excluded, because they can be downloaded again.
+- **Sharing and moving to the Mac.** *Share Recording and Transcript* (on an entry) and *Export Everything* (in Settings) write the original recording named with its date and title, for example `20261114-050812 Morning walk.m4a`, plus a Markdown copy of the transcript. AirDrop the files to the Mac and choose **File > Import Recordings…** (⇧⌘I) in Mneme for Mac, or drop them on its window: they keep their date and title and are transcribed on the Mac. Audio files from Voice Memos or Files can also be opened in Mneme on the phone.
+
+### Install it on your iPhone with Xcode
+
+No paid developer account is needed to run it on your own phone:
+
+1. Open `iOS/Mneme.xcodeproj` in Xcode 16 or later. Xcode resolves the Swift packages on first open.
+2. Select the **Mneme** target, then **Signing & Capabilities**. Choose your team (your Apple ID, added under Xcode > Settings > Accounts). If Xcode reports that the bundle identifier `tech.feki.mneme` is not available, change it to something unique, such as `com.yourname.mneme`.
+3. Connect the iPhone, select it as the run destination and press Run (⌘R). The first time, enable **Developer Mode** on the phone (Settings > Privacy & Security) and trust the developer certificate (Settings > General > VPN & Device Management).
+
+With a free Apple ID the installation is valid for 7 days; press Run again to renew it. Your archive stays on the phone when you reinstall. A paid Apple Developer Program membership removes the limit and allows TestFlight.
+
+To try the app without touching a real archive, add the launch argument `-demo` in the scheme (Product > Scheme > Edit Scheme > Arguments; it is there, switched off): a temporary archive with sample entries is used instead.
 
 ## First run: download a model
 
@@ -239,6 +261,8 @@ Check each dataset's licence before redistributing anything derived from it.
   Models/             WhisperKit models
 ```
 
+On the iPhone the same folders are inside the app's container (`Library/Application Support/Mneme/`), protected by the phone's data protection.
+
 ## Quality, CI and releases
 
 How Mneme is built, tested, evaluated and released is described in [docs/MLOPS.md](docs/MLOPS.md). In short:
@@ -252,7 +276,7 @@ How Mneme is built, tested, evaluated and released is described in [docs/MLOPS.m
 
 `./Scripts/dev-loop.sh` re-runs `check.sh` whenever `.logs/request` changes. Leave it running in Terminal while changes are made from another session. Each run writes the full build and test output to `.logs/latest.log`, ending with `RESULT: PASS` or `RESULT: FAIL`.
 
-`check.sh` also runs the app's smoke test (`MnemeApp --smoke-test`): it exercises a temporary archive and renders every screen offscreen. When `.logs/request` contains `build-app`, a passing run also packages `build/Mneme.app`.
+`check.sh` also runs the app's smoke test (`MnemeApp --smoke-test`): it exercises a temporary archive and renders every screen offscreen. When `.logs/request` contains `build-app`, a passing run also packages `build/Mneme.app`. When it contains `ios`, a passing run also runs `Scripts/ios-check.sh`: the iPhone app is built for the iOS Simulator, opened in demo mode on every screen, and screenshots are written to `.logs/ios/` (CI does the same on every push).
 
 Other request keywords: `turbo` measures large-v3 turbo against large-v3 (accent set and long recordings), `codeswitch` runs the code-switching comparison above (`codeswitch-fast` for turbo only), `gate` runs the canonical suites against the committed baselines, and `baseline` writes new baselines from a real run (add `accurate` to include the second model).
 
@@ -264,7 +288,9 @@ When `.logs/request` contains `model-check`, `check.sh` also runs `Scripts/model
 Sources/MnemeCore     archive, validation, language policy, metrics, evaluation, model manifests (no third-party dependencies)
 Sources/MnemeSpeech   WhisperKit engine, model management, ingest pipeline, accent evaluator
 Sources/MnemeCLI      the `mneme` command
-Sources/MnemeApp      the SwiftUI app (packaged by Scripts/build-app.sh)
+Sources/MnemeAppSupport  app state, transcription queue, recording, playback and export, shared by the Mac and iPhone apps
+Sources/MnemeApp      the Mac app (packaged by Scripts/build-app.sh)
+iOS/                  the iPhone and iPad app (Xcode project using the package above)
 Tests/                unit and property tests, and the opt-in end-to-end test
 Scripts/              build loop, model checks and evaluation suites, sample generation, dataset export
 Evaluation/           committed evaluation baselines

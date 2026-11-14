@@ -9,3 +9,4 @@ mneme-eval/
 build/
 .idea/
 *.xcuserstate
+__pycache__/

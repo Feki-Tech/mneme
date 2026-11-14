@@ -1,0 +1,310 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		249EECC7C35B3B7592D6B407 /* MnemeCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3C7A876575089B0D66669B00 /* MnemeCore */; };
+		7DAECC4379B8A819C629A082 /* MnemeSpeech in Frameworks */ = {isa = PBXBuildFile; productRef = 81E8231EE6E4C069BBBFE5E3 /* MnemeSpeech */; };
+		4E9E8FA13E33E164474D6015 /* MnemeAppSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 5496818EAD4647DE721A0A78 /* MnemeAppSupport */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		67D72E8F0FA36FB783FCF01C /* Mneme.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mneme.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		12057C5FCC4385FABEEFA8C1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		12741E2B17D085B6F3FEBF38 /* Mneme */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Mneme;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B99175707C89D29025B21FE2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				249EECC7C35B3B7592D6B407 /* MnemeCore in Frameworks */,
+				7DAECC4379B8A819C629A082 /* MnemeSpeech in Frameworks */,
+				4E9E8FA13E33E164474D6015 /* MnemeAppSupport in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		5EE36DC165588721B370244D = {
+			isa = PBXGroup;
+			children = (
+				12741E2B17D085B6F3FEBF38 /* Mneme */,
+				12057C5FCC4385FABEEFA8C1 /* Info.plist */,
+				9A2F8997DA0EBCA1493E1CB8 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		9A2F8997DA0EBCA1493E1CB8 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				67D72E8F0FA36FB783FCF01C /* Mneme.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		64274DD3C78892AAC565F882 /* Mneme */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 39601D6F528B51947D98EFF5 /* Build configuration list for PBXNativeTarget "Mneme" */;
+			buildPhases = (
+				29E32566F6AA684E64437201 /* Sources */,
+				B99175707C89D29025B21FE2 /* Frameworks */,
+				FB5E4456E7F7A3B7E07EF6B8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				12741E2B17D085B6F3FEBF38 /* Mneme */,
+			);
+			name = Mneme;
+			packageProductDependencies = (
+				3C7A876575089B0D66669B00 /* MnemeCore */,
+				81E8231EE6E4C069BBBFE5E3 /* MnemeSpeech */,
+				5496818EAD4647DE721A0A78 /* MnemeAppSupport */,
+			);
+			productName = Mneme;
+			productReference = 67D72E8F0FA36FB783FCF01C /* Mneme.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		BB6018E7BE3383BD90B62E92 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					64274DD3C78892AAC565F882 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = B5A4AC6DF85390AF5AC40EBA /* Build configuration list for PBXProject "Mneme" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 5EE36DC165588721B370244D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C8EA85A22131F282115CB9A5 /* XCLocalSwiftPackageReference ".." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 9A2F8997DA0EBCA1493E1CB8 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				64274DD3C78892AAC565F882 /* Mneme */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		FB5E4456E7F7A3B7E07EF6B8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		29E32566F6AA684E64437201 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0122F5228E4C8E96A31DC189 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AF3D12AFFC475BF1B4A1CEDB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		0FDE8D065720349603F2A1DD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Mneme;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Mneme records your voice so it can be transcribed on this device. Recordings never leave it unless you share them.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportsDocumentBrowser = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = tech.feki.mneme;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7515649C2B24941FF59A80C7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Mneme;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Mneme records your voice so it can be transcribed on this device. Recordings never leave it unless you share them.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportsDocumentBrowser = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = tech.feki.mneme;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B5A4AC6DF85390AF5AC40EBA /* Build configuration list for PBXProject "Mneme" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0122F5228E4C8E96A31DC189 /* Debug */,
+				AF3D12AFFC475BF1B4A1CEDB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		39601D6F528B51947D98EFF5 /* Build configuration list for PBXNativeTarget "Mneme" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0FDE8D065720349603F2A1DD /* Debug */,
+				7515649C2B24941FF59A80C7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		C8EA85A22131F282115CB9A5 /* XCLocalSwiftPackageReference ".." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3C7A876575089B0D66669B00 /* MnemeCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C8EA85A22131F282115CB9A5 /* XCLocalSwiftPackageReference ".." */;
+			productName = MnemeCore;
+		};
+		81E8231EE6E4C069BBBFE5E3 /* MnemeSpeech */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C8EA85A22131F282115CB9A5 /* XCLocalSwiftPackageReference ".." */;
+			productName = MnemeSpeech;
+		};
+		5496818EAD4647DE721A0A78 /* MnemeAppSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C8EA85A22131F282115CB9A5 /* XCLocalSwiftPackageReference ".." */;
+			productName = MnemeAppSupport;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = BB6018E7BE3383BD90B62E92 /* Project object */;
+}

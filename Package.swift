@@ -13,6 +13,8 @@ let package = Package(
         .executable(name: "MnemeApp", targets: ["MnemeApp"]),
         .library(name: "MnemeCore", targets: ["MnemeCore"]),
         .library(name: "MnemeSpeech", targets: ["MnemeSpeech"]),
+        // State and audio for the Mac and iPhone apps (the iPhone app is the Xcode project in iOS/).
+        .library(name: "MnemeAppSupport", targets: ["MnemeAppSupport"]),
     ],
     dependencies: [
         // WhisperKit (Argmax open-source SDK). 1.1.0 fixes empty transcriptions when prompt tokens are set.
@@ -41,12 +43,18 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
-        // SwiftUI app: recording, playback, review of flagged passages, notes.
+        // Shared by the Mac and iPhone apps: app state, transcription queue, recording, playback, export.
+        .target(
+            name: "MnemeAppSupport",
+            dependencies: ["MnemeCore", "MnemeSpeech"]
+        ),
+        // SwiftUI app for macOS: recording, playback, review of flagged passages, notes.
         .executableTarget(
             name: "MnemeApp",
-            dependencies: ["MnemeCore", "MnemeSpeech"]
+            dependencies: ["MnemeCore", "MnemeSpeech", "MnemeAppSupport"]
         ),
         .testTarget(name: "MnemeCoreTests", dependencies: ["MnemeCore"]),
         .testTarget(name: "MnemeSpeechTests", dependencies: ["MnemeCore", "MnemeSpeech"]),
+        .testTarget(name: "MnemeAppSupportTests", dependencies: ["MnemeCore", "MnemeSpeech", "MnemeAppSupport"]),
     ]
 )

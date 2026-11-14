@@ -90,4 +90,11 @@ if [ $status -eq 0 ] && grep -q "build-app" .logs/request 2>/dev/null; then
   status=$?
   grep -E "error:|BUILD APP:" .logs/build-app.log | tail -n 5
 fi
+
+# "ios" in .logs/request also builds the iPhone app and captures its screens in the simulator (.logs/ios/).
+if [ $status -eq 0 ] && grep -qw "ios" .logs/request 2>/dev/null; then
+  echo "Checking the iPhone app (log: .logs/ios.log)..."
+  bash ./Scripts/ios-check.sh
+  status=$?
+fi
 exit $status

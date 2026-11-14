@@ -1,3 +1,4 @@
+import MnemeAppSupport
 import AppKit
 import AVFoundation
 import Foundation

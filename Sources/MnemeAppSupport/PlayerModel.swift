@@ -3,18 +3,18 @@ import Foundation
 
 /// Plays archived originals, whole or one segment at a time.
 @MainActor
-final class PlayerModel: ObservableObject {
-    @Published private(set) var url: URL?
-    @Published private(set) var isPlaying = false
-    @Published private(set) var currentTime: TimeInterval = 0
-    @Published private(set) var duration: TimeInterval = 0
+public final class PlayerModel: ObservableObject {
+    @Published public private(set) var url: URL?
+    @Published public private(set) var isPlaying = false
+    @Published public private(set) var currentTime: TimeInterval = 0
+    @Published public private(set) var duration: TimeInterval = 0
 
     private var player: AVAudioPlayer?
     private var timer: Timer?
     private var stopTime: TimeInterval?
 
     /// Plays `url` from `start` (or where it was paused) and pauses at `end` when given.
-    func play(url: URL, from start: TimeInterval? = nil, until end: TimeInterval? = nil) {
+    public func play(url: URL, from start: TimeInterval? = nil, until end: TimeInterval? = nil) {
         if self.url != url || player == nil {
             stop()
             guard let newPlayer = try? AVAudioPlayer(contentsOf: url) else { return }
@@ -24,6 +24,13 @@ final class PlayerModel: ObservableObject {
             duration = newPlayer.duration
         }
         guard let player else { return }
+        #if os(iOS)
+        // Plays through the speaker even with the ring switch on silent, unless a recording is in progress.
+        if AVAudioSession.sharedInstance().category != .playAndRecord {
+            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+        }
+        try? AVAudioSession.sharedInstance().setActive(true)
+        #endif
         if let start {
             player.currentTime = max(0, min(start, player.duration))
         }
@@ -34,7 +41,7 @@ final class PlayerModel: ObservableObject {
         startTimer()
     }
 
-    func togglePlayback(url: URL) {
+    public func togglePlayback(url: URL) {
         if plays(url) {
             pause()
         } else {
@@ -42,14 +49,14 @@ final class PlayerModel: ObservableObject {
         }
     }
 
-    func pause() {
+    public func pause() {
         player?.pause()
         isPlaying = false
         stopTime = nil
         stopTimer()
     }
 
-    func stop() {
+    public func stop() {
         player?.stop()
         player = nil
         url = nil
@@ -60,18 +67,18 @@ final class PlayerModel: ObservableObject {
         stopTimer()
     }
 
-    func seek(to time: TimeInterval) {
+    public func seek(to time: TimeInterval) {
         guard let player else { return }
         player.currentTime = max(0, min(time, player.duration))
         currentTime = player.currentTime
     }
 
-    func plays(_ candidate: URL) -> Bool {
+    public func plays(_ candidate: URL) -> Bool {
         isPlaying && url == candidate
     }
 
     /// True while the playhead of `candidate` is inside `start..<end`.
-    func isWithin(_ candidate: URL?, start: TimeInterval, end: TimeInterval) -> Bool {
+    public func isWithin(_ candidate: URL?, start: TimeInterval, end: TimeInterval) -> Bool {
         guard let candidate, url == candidate, player != nil else { return false }
         return currentTime >= start && currentTime < max(end, start + 0.05)
     }

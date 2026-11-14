@@ -1,11 +1,15 @@
 import AVFoundation
 import Foundation
 
-enum RecorderError: LocalizedError {
+public enum RecorderError: LocalizedError {
     case couldNotStart
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
+        #if os(iOS)
+        "The microphone could not be started. Another app may be using it, or a call is in progress."
+        #else
         "The microphone could not be started. Check the input device in System Settings > Sound."
+        #endif
     }
 }
 
@@ -15,33 +19,36 @@ enum RecorderError: LocalizedError {
 /// recording, everything written so far stays readable and is archived at the next launch. Finished
 /// recordings are encoded to AAC for the archive (see `AudioEncoder`).
 @MainActor
-final class RecorderModel: ObservableObject {
-    enum Permission {
+public final class RecorderModel: ObservableObject {
+    public enum Permission {
         case undetermined
         case granted
         case denied
     }
 
-    @Published private(set) var permission: Permission
-    @Published private(set) var isRecording = false
+    @Published public private(set) var permission: Permission
+    @Published public private(set) var isRecording = false
     /// Input level from 0 to 1.
-    @Published private(set) var level: Double = 0
-    @Published private(set) var elapsed: TimeInterval = 0
+    @Published public private(set) var level: Double = 0
+    @Published public private(set) var elapsed: TimeInterval = 0
 
     private var recorder: AVAudioRecorder?
     private var timer: Timer?
     private var fileURL: URL?
+    #if os(iOS)
+    private var interruptionObserver: NSObjectProtocol?
+    #endif
 
     /// The file being written, which recovery must leave alone.
-    var activeFileName: String? {
+    public var activeFileName: String? {
         fileURL?.lastPathComponent
     }
 
-    init() {
+    public init() {
         permission = RecorderModel.currentPermission()
     }
 
-    static func currentPermission() -> Permission {
+    public static func currentPermission() -> Permission {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
             return .granted
@@ -52,13 +59,13 @@ final class RecorderModel: ObservableObject {
         }
     }
 
-    func requestPermission() async {
+    public func requestPermission() async {
         let granted = await AVCaptureDevice.requestAccess(for: .audio)
         permission = granted ? .granted : .denied
     }
 
     /// Starts recording into `folder`, which is created privately (0700) if needed.
-    func start(in folder: URL) throws {
+    public func start(in folder: URL) throws {
         guard !isRecording else { return }
         try FileManager.default.createDirectory(
             at: folder,
@@ -75,6 +82,9 @@ final class RecorderModel: ObservableObject {
             AVLinearPCMIsBigEndianKey: false,
             AVLinearPCMIsNonInterleaved: false,
         ]
+        #if os(iOS)
+        try RecorderModel.activateSession()
+        #endif
         let newRecorder = try AVAudioRecorder(url: url, settings: settings)
         newRecorder.isMeteringEnabled = true
         guard newRecorder.record() else {
@@ -90,10 +100,13 @@ final class RecorderModel: ObservableObject {
                 self?.tick()
             }
         }
+        #if os(iOS)
+        observeInterruptions()
+        #endif
     }
 
     /// Stops and returns the finished file.
-    func stop() -> URL? {
+    public func stop() -> URL? {
         guard let recorder, isRecording else { return nil }
         recorder.stop()
         timer?.invalidate()
@@ -103,11 +116,44 @@ final class RecorderModel: ObservableObject {
         self.recorder = nil
         let url = fileURL
         fileURL = nil
+        #if os(iOS)
+        if let interruptionObserver {
+            NotificationCenter.default.removeObserver(interruptionObserver)
+            self.interruptionObserver = nil
+        }
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
         return url
     }
 
+    #if os(iOS)
+    /// Recording keeps going with the screen locked (the app declares the audio background mode). A call or an
+    /// alarm pauses it; it resumes when the interruption ends, in the same file.
+    private static func activateSession() throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+        try session.setActive(true)
+    }
+
+    private func observeInterruptions() {
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            let ended = raw.flatMap(AVAudioSession.InterruptionType.init(rawValue:)) == .ended
+            MainActor.assumeIsolated {
+                guard ended, let self, self.isRecording, let recorder = self.recorder else { return }
+                try? RecorderModel.activateSession()
+                recorder.record()
+            }
+        }
+    }
+    #endif
+
     /// Stops and deletes the recording.
-    func discard() {
+    public func discard() {
         if let url = stop() {
             try? FileManager.default.removeItem(at: url)
         }

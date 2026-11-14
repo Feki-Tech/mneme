@@ -32,13 +32,24 @@ public struct ModelProfile: Equatable, Sendable {
         summary: "Whisper large-v3 turbo (4-layer decoder), compressed. Same accuracy as large-v3 on the accent test, 3–5× faster."
     )
 
+    /// Whisper small, compressed: for iPhones with less memory. Noticeably less accurate than turbo; not part of the
+    /// evaluated profiles.
+    public static let compact = ModelProfile(
+        name: "compact",
+        variant: "small_216MB",
+        approximateDownloadSize: "about 216 MB",
+        summary: "Whisper small, compressed. For iPhones with less memory; less accurate than fast."
+    )
+
     public static let builtIn: [ModelProfile] = [fast, accurate]
+    /// The choices offered by the iPhone app: large-v3 (about 3 GB) needs more memory than an iPhone gives an app.
+    public static let phone: [ModelProfile] = [fast, compact]
     public static let defaultProfile = fast
 
     /// A built-in profile by name ("accurate", "fast"), or any WhisperKit variant name ("small", "large-v3_turbo").
     public static func resolve(_ name: String) -> ModelProfile {
         let key = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let match = builtIn.first(where: { $0.name == key.lowercased() || $0.variant == key }) {
+        if let match = (builtIn + [compact]).first(where: { $0.name == key.lowercased() || $0.variant == key }) {
             return match
         }
         return ModelProfile(
